@@ -147,7 +147,14 @@ export async function fetchFinanceReport() {
   );
   return res.data;
 }
+export async function saveDebtReturn(data) {
+  const response = await axios.post(BASE_URL, {
+    action: "saveDebtReturn",
+    ...data,
+  });
 
+  return response.data;
+}
 // --- СТАРАЯ КЛИЕНТСКАЯ СОВМЕСТИМОСТЬ (Явный экспорт функций для экранов) ---
 export const saveClientOnServer = saveClient;
 export const updateClientOnServer = updateClient;

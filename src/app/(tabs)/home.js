@@ -45,42 +45,21 @@ export default function HomeScreen() {
             <Text style={styles.subTileEmoji}>👥</Text>
             <Text style={styles.subTileTitle}>База клиентов</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.subTile}
             onPress={() => router.push("/homeScreen/expensesScreen")}
           >
-            <Text style={styles.subTileEmoji}>💵</Text>
+            <Text style={styles.subTileEmoji}>💸</Text>
             <Text style={styles.subTileTitle}>Расходы</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.subTile}
-            onPress={() => router.push("/homeScreen/financeScreen")}
-          >
-            <Text style={styles.subTileEmoji}>💵</Text>
-            <Text style={styles.subTileTitle}>Деньги</Text>
-          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.subTile}
             onPress={() => router.push("/homeScreen/debtorsScreen")}
           >
             <Text style={styles.subTileEmoji}>📉</Text>
             <Text style={styles.subTileTitle}>Должники</Text>
-          </TouchableOpacity>
-
-          {/* <TouchableOpacity
-            style={styles.subTile}
-            onPress={() => router.push("/homeScreen/paymentScreen")}
-          >
-            <Text style={styles.subTileEmoji}>💵</Text>
-            <Text style={styles.subTileTitle}>Принять платеж</Text>
-          </TouchableOpacity> */}
-
-          <TouchableOpacity
-            style={styles.subTile}
-            onPress={() => router.push("/homeScreen/returnsScreen")}
-          >
-            <Text style={styles.subTileEmoji}>🔄</Text>
-            <Text style={styles.subTileTitle}>Возвраты</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -33,6 +33,7 @@ export default function CreateOrder() {
     phone: "",
   });
   const [isSavingClient, setIsSavingClient] = useState(false);
+
   // Внутри CreateOrder.js
   useEffect(() => {
     async function fetchData() {
@@ -67,7 +68,6 @@ export default function CreateOrder() {
 
   const [deliveryDate, setDeliveryDate] = useState(tomorrow);
 
-  // Состояние товаров со структурой { qty, comment }
   const [items, setItems] = useState(
     PRODUCTS.reduce((acc, product) => {
       acc[product] = {
@@ -106,7 +106,15 @@ export default function CreateOrder() {
       },
     }));
   }
+  function calculatePromo(qty) {
+    const giftQty = Math.floor(qty / 10);
 
+    return {
+      giftQty,
+      finalQty: qty + giftQty,
+      paidQty: qty,
+    };
+  }
   function changeComment(product, text) {
     if (loading) return;
     setItems((prev) => ({
@@ -127,15 +135,20 @@ export default function CreateOrder() {
       return sum + item.qty * (PRICES[product] || 0);
     }, 0);
   }, [items]);
-
   async function handleSave() {
     const orderItems = Object.entries(items)
       .filter(([_, item]) => item.qty > 0)
-      .map(([product, item]) => ({
-        product,
-        quantity: item.qty,
-        comment: item.comment,
-      }));
+      .map(([product, item]) => {
+        const { paidQty, giftQty, finalQty } = calculatePromo(item.qty);
+
+        return {
+          product,
+          quantity: finalQty,
+          paidQuantity: paidQty,
+          giftQuantity: giftQty,
+          comment: item.comment,
+        };
+      });
 
     if (orderItems.length === 0) {
       Alert.alert("Ошибка", "Добавьте хотя бы один товар");
@@ -309,6 +322,8 @@ export default function CreateOrder() {
 
         {PRODUCTS.map((product) => {
           const hasQty = items[product].qty > 0;
+          const promo = calculatePromo(items[product].qty);
+
           return (
             <View
               key={product}
@@ -317,9 +332,22 @@ export default function CreateOrder() {
               <View style={styles.topRow}>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName}>{product}</Text>
+
                   <Text style={styles.productPrice}>
                     {PRICES[product] || 0} сом / шт
                   </Text>
+
+                  {promo.giftQty > 0 && (
+                    <View style={{marginTop: 10}}>
+                      <Text style={{ color: "#22c55e", fontWeight: "700", marginBottom: 5 }}>
+                        🎁 Подарок: {promo.giftQty} шт
+                      </Text>
+
+                      <Text style={{ color: "#666" }}>
+                        Итого выдача: {promo.finalQty} шт
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.counterContainer}>
@@ -390,6 +418,7 @@ export default function CreateOrder() {
             <Text style={styles.summaryLabel}>Всего коробок:</Text>
             <Text style={styles.summaryValue}>{totalBoxes} шт</Text>
           </View>
+
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Общая сумма:</Text>
             <Text style={styles.totalValue}>
@@ -598,13 +627,14 @@ const styles = StyleSheet.create({
   },
   productInfo: {
     flex: 1,
-    marginRight: 10,
+    paddingRight: 10,
   },
   productName: {
     fontSize: 16,
     fontWeight: "700",
     color: "#1a1a1a",
     marginBottom: 4,
+    flexShrink: 1,
   },
   productPrice: {
     fontSize: 13,

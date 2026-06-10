@@ -9,9 +9,9 @@ export default function RootLayout() {
         options={{
           headerShown: true,
           title: "Главная",
-          headerTitleAlign: "center", // По желанию: выравнивание заголовка по центру
-          headerStyle: { backgroundColor: "#f8f9fa" }, // Цвет фона шапки
-          headerTintColor: "#1a1a1a", // Цвет текста заголовка
+          headerTitleAlign: "center",
+          headerStyle: { backgroundColor: "#f8f9fa" },
+          headerTintColor: "#1a1a1a",
           headerTitleStyle: { fontWeight: "800" },
         }}
       />
@@ -37,10 +37,7 @@ export default function RootLayout() {
         name="homeScreen/expensesScreen"
         options={{ headerShown: true, title: "Расходы" }}
       />
-       <Stack.Screen
-        name="homeScreen/financeScreen"
-        options={{ headerShown: true, title: "Деньги" }}
-      />
+
       {/* Группа деталей */}
       <Stack.Screen
         name="details/createOrder"

@@ -1,22 +1,36 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 
 import CLIENTS from "../../constants/clients"; // Импортируем для поиска связи клиент -> рынок
 import MARKETS from "../../constants/markets"; // Импортируем массив рынков
-import { getDebtors } from "../../services/api";
+import { getDebtors, saveDebtReturn, savePayment } from "../../services/api";
 
 export default function DebtorsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [groupedDebtors, setGroupedDebtors] = useState({});
 
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [returnModalVisible, setReturnModalVisible] = useState(false);
+
+  const [selectedDebtor, setSelectedDebtor] = useState(null);
+
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [returnAmount, setReturnAmount] = useState("");
+
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [returnLoading, setReturnLoading] = useState(false);
   useEffect(() => {
     loadData();
   }, []);
@@ -25,10 +39,11 @@ export default function DebtorsScreen() {
     try {
       const data = await getDebtors();
 
-      // 1. Фильтруем только должников и сортируем по убыванию суммы долга
-      const onlyDebtors = data
-        .filter((item) => Number(item.debt) > 0)
+      // Убедитесь, что data - это массив
+      const onlyDebtors = (Array.isArray(data) ? data : Object.values(data))
+        .filter((item) => Math.round(item.debt) > 0)
         .sort((a, b) => Number(b.debt) - Number(a.debt));
+      // 1. Фильтруем только должников и сортируем по убыванию суммы долга
 
       // 2. Инициализируем группы на основе официального массива MARKETS
       const grouped = {};
@@ -62,7 +77,67 @@ export default function DebtorsScreen() {
       setRefreshing(false);
     }
   }
+  const handlePayment = async () => {
+    const amount = Number(paymentAmount);
 
+    if (!amount || amount <= 0) {
+      Alert.alert("Ошибка", "Введите сумму");
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+
+      const res = await savePayment({
+        client: selectedDebtor.client,
+        amount,
+      });
+
+      if (res.success) {
+        Alert.alert("Успешно", "Оплата проведена");
+
+        setPaymentModalVisible(false);
+        setPaymentAmount("");
+
+        await loadData();
+      }
+    } catch (e) {
+      Alert.alert("Ошибка", "Не удалось сохранить оплату");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleReturn = async () => {
+    const amount = Number(returnAmount);
+
+    if (!amount || amount <= 0) {
+      Alert.alert("Ошибка", "Введите сумму");
+      return;
+    }
+
+    try {
+      setReturnLoading(true);
+
+      const res = await saveDebtReturn({
+        client: selectedDebtor.client,
+        amount,
+      });
+
+      if (res.success) {
+        Alert.alert("Успешно", "Возврат оформлен");
+
+        setReturnModalVisible(false);
+        setReturnAmount("");
+
+        await loadData();
+      }
+    } catch (e) {
+      Alert.alert("Ошибка", "Не удалось оформить возврат");
+    } finally {
+      setReturnLoading(false);
+    }
+  };
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
@@ -82,75 +157,254 @@ export default function DebtorsScreen() {
   );
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={["#1a1a1a"]}
-          tintColor="#1a1a1a"
-        />
-      }
-    >
-      <Text style={styles.title}>Должники</Text>
+    <>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#1a1a1a"]}
+            tintColor="#1a1a1a"
+          />
+        }
+      >
+        <Text style={styles.title}>Должники</Text>
 
-      {marketsToRender.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>🎉 Отлично! Должников пока нет.</Text>
-        </View>
-      ) : (
-        marketsToRender.map((marketName) => (
-          <View key={marketName} style={styles.marketSection}>
-            {/* Красивый заголовок рынка */}
-            <Text style={styles.marketHeaderTitle}>📍 {marketName}</Text>
-
-            {/* Список должников внутри конкретного рынка */}
-            {groupedDebtors[marketName].map((item, index) => (
-              <View key={index} style={[styles.card, styles.activeDebtCard]}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.name}>👤 {item.client}</Text>
-                  <Text style={styles.miniDebtBadge}>
-                    -{Number(item.debt).toLocaleString()} c.
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>📦 Заказано:</Text>
-                  <Text style={styles.infoValue}>
-                    {Number(item.ordered).toLocaleString()} сом
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>🔄 Возвраты:</Text>
-                  <Text style={styles.infoValue}>
-                    {Number(item.returns).toLocaleString()} сом
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>💵 Оплачено:</Text>
-                  <Text style={styles.infoValue}>
-                    {Number(item.paid).toLocaleString()} сом
-                  </Text>
-                </View>
-
-                <View style={[styles.infoRow, styles.debtRow]}>
-                  <Text style={styles.debtLabel}>Остаток долга:</Text>
-                  <Text style={[styles.debtValue, styles.textRed]}>
-                    {Number(item.debt).toLocaleString()} сом
-                  </Text>
-                </View>
-              </View>
-            ))}
+        {marketsToRender.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              🎉 Отлично! Должников пока нет.
+            </Text>
           </View>
-        ))
-      )}
+        ) : (
+          marketsToRender.map((marketName) => (
+            <View key={marketName} style={styles.marketSection}>
+              {/* Красивый заголовок рынка */}
+              <Text style={styles.marketHeaderTitle}>📍 {marketName}</Text>
 
-      <View style={styles.spacer} />
-    </ScrollView>
+              {/* Список должников внутри конкретного рынка */}
+              {groupedDebtors[marketName].map((item, index) => (
+                <View key={index} style={[styles.card, styles.activeDebtCard]}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.name}>👤 {item.client}</Text>
+                    <Text style={styles.miniDebtBadge}>
+                      -{Number(item.debt).toLocaleString()} c.
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>📦 Заказано:</Text>
+                    <Text style={[styles.infoValue, { color: "#1a1a1a" }]}>
+                      {Number(item.ordered).toLocaleString()} сом
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>🔄 Возвраты:</Text>
+                    <Text style={[styles.infoValue, { color: "#dc2626" }]}>
+                      {Number(item.returns).toLocaleString()} сом
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>💵 Оплачено:</Text>
+                    <Text style={[styles.infoValue, { color: "#16a34a" }]}>
+                      {Number(item.paid).toLocaleString()} сом
+                    </Text>
+                  </View>
+
+                  <View style={[styles.infoRow, styles.debtRow]}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        marginTop: 12,
+                        marginBottom: 20,
+                      }}
+                    >
+                      <TouchableOpacity
+                        disabled={paymentLoading}
+                        style={{
+                          flex: 1,
+                          backgroundColor: "#16a34a",
+                          padding: 10,
+                          borderRadius: 8,
+                          marginRight: 6,
+                          alignItems: "center",
+                        }}
+                        onPress={() => {
+                          setSelectedDebtor(item);
+                          setPaymentAmount("");
+                          setPaymentModalVisible(true);
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontWeight: "700" }}>
+                          💵 Оплата
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        disabled={returnLoading}
+                        style={{
+                          flex: 1,
+                          backgroundColor: "#dc2626",
+                          padding: 10,
+                          borderRadius: 8,
+                          marginLeft: 6,
+                          alignItems: "center",
+                        }}
+                        onPress={() => {
+                          setSelectedDebtor(item);
+                          setReturnAmount("");
+                          setReturnModalVisible(true);
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontWeight: "700" }}>
+                          🔄 Возврат
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View>
+                    <Text style={styles.debtLabel}>Остаток долга:</Text>
+                    <Text style={[styles.debtValue, styles.textRed]}>
+                      {Number(item.debt).toLocaleString()} сом
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))
+        )}
+
+        <View style={styles.spacer} />
+        <Modal
+          visible={paymentModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {}}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                Оплата: {selectedDebtor?.client}
+              </Text>
+
+              <TextInput
+                style={styles.moneyInput}
+                keyboardType="numeric"
+                placeholder="Сумма оплаты"
+                value={paymentAmount}
+                onChangeText={setPaymentAmount}
+              />
+              {paymentLoading ? (
+                <ActivityIndicator color="#16a34a" />
+              ) : (
+                <TouchableOpacity
+                  onPress={handlePayment}
+                  disabled={paymentLoading}
+                  style={{
+                    backgroundColor: "#16a34a",
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#ffffff",
+                      fontWeight: "bold",
+                      fontSize: 16,
+                    }}
+                  >
+                    Сохранить оплату
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                disabled={paymentLoading}
+                onPress={() => {
+                  if (paymentLoading) return;
+
+                  setPaymentModalVisible(false);
+                  setPaymentAmount("");
+                }}
+              >
+                <Text>Отмена</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={returnModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {}}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                Возврат: {selectedDebtor?.client}
+              </Text>
+
+              <TextInput
+                style={styles.moneyInput}
+                keyboardType="numeric"
+                placeholder="Сумма возврата"
+                value={returnAmount}
+                onChangeText={setReturnAmount}
+              />
+              {returnLoading ? (
+                <ActivityIndicator color="#dc2626" />
+              ) : (
+                <TouchableOpacity
+                  onPress={handleReturn}
+                  disabled={returnLoading}
+                  style={{
+                    backgroundColor: "#dc2626",
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#ffffff",
+                      fontWeight: "bold",
+                      fontSize: 16,
+                    }}
+                  >
+                    Оформить возврат
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                disabled={returnLoading}
+                onPress={() => {
+                  if (returnLoading) return;
+
+                  setReturnModalVisible(false);
+                  setReturnAmount("");
+                }}
+              >
+                <Text>Отмена</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </>
   );
 }
 
@@ -274,5 +528,45 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: 40,
+  },
+  actionRow: {
+    flexDirection: "row",
+    marginTop: 12,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+
+  modalContent: {
+    backgroundColor: "#fff",
+    width: "85%",
+    borderRadius: 16,
+    padding: 20,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+
+  moneyInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 15,
+    color: "#000",
+    fontSize: 16,
+  },
+
+  cancelBtn: {
+    marginTop: 10,
+    alignItems: "center",
   },
 });

@@ -362,7 +362,7 @@ export default function OrderDetailScreen() {
                 },
               ]}
             >
-              {Math.max(0, currentDebt).toLocaleString()} сом
+              {Math.round(Math.max(0, currentDebt)).toLocaleString()} сом
             </Text>
           </View>
         </View>
@@ -374,14 +374,14 @@ export default function OrderDetailScreen() {
             onPress={() => setPaymentModalVisible(true)}
             disabled={saving}
           >
-            <Text style={styles.finBtnText}>💵 Внести оплату</Text>
+            <Text style={styles.finBtnText}>Внести оплату</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.finBtn, { backgroundColor: "#dc2626" }]}
             onPress={() => setReturnModalVisible(true)}
             disabled={saving}
           >
-            <Text style={styles.finBtnText}>📦 Оформить возврат</Text>
+            <Text style={styles.finBtnText}>Оформить возврат</Text>
           </TouchableOpacity>
         </View>
 
