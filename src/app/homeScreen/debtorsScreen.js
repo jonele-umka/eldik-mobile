@@ -38,7 +38,7 @@ export default function DebtorsScreen() {
   async function loadData() {
     try {
       const data = await getDebtors();
-
+console.log(data)
       // Убедитесь, что data - это массив
       const onlyDebtors = (Array.isArray(data) ? data : Object.values(data))
         .filter((item) => Math.round(item.debt) > 0)
@@ -91,6 +91,8 @@ export default function DebtorsScreen() {
       const res = await savePayment({
         client: selectedDebtor.client,
         amount,
+        orderDate: selectedDebtor.lastOrderDate,
+        market: selectedDebtor.market,
       });
 
       if (res.success) {
@@ -121,6 +123,7 @@ export default function DebtorsScreen() {
 
       const res = await saveDebtReturn({
         client: selectedDebtor.client,
+        market: selectedDebtor.market,
         amount,
       });
 

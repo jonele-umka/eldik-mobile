@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import AnalyticsScreen from "../homeScreen/AnalyticsScreen";
 
 export default function HomeScreen() {
   return (
@@ -61,52 +62,53 @@ export default function HomeScreen() {
             <Text style={styles.subTileEmoji}>📉</Text>
             <Text style={styles.subTileTitle}>Должники</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.subTile}
+            onPress={() => router.push("/homeScreen/reportsScreen")}
+          >
+            <Text style={styles.subTileEmoji}>📈</Text>
+            <Text style={styles.subTileTitle}>Отчеты</Text>
+          </TouchableOpacity>
         </View>
+        <AnalyticsScreen />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
-
-  logoText: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#1a1a1a",
-    letterSpacing: 0.5,
-  },
-  scrollContent: { paddingBottom: 30 },
+  container: { flex: 1, backgroundColor: "#F5F7FA" }, // Более мягкий фон
+  scrollContent: { paddingBottom: 40 },
 
   // Главная кнопка заказа
-  mainActionContainer: { paddingHorizontal: 16, marginTop: 20 },
+  mainActionContainer: { paddingHorizontal: 16, marginTop: 24 },
   mainTile: {
     backgroundColor: "#22c55e",
-    padding: 20,
-    borderRadius: 20,
+    padding: 24,
+    borderRadius: 24,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowColor: "#22c55e",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  tileEmoji: { fontSize: 32, marginRight: 16 },
+  tileEmoji: { fontSize: 36, marginRight: 16 },
   mainTileTextContainer: { flex: 1 },
   tileTitle: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  tileDesc: { fontSize: 12, color: "rgba(255,255,255,0.9)", marginTop: 4 },
+  tileDesc: { fontSize: 13, color: "rgba(255,255,255,0.9)", marginTop: 4 },
 
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    color: "#666",
+    color: "#1A1A1A",
     marginLeft: 16,
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: 32,
+    marginBottom: 16,
   },
 
-  // Сетка маленьких кнопок 2х2
+  // Сетка 2х2
   grid: {
     paddingHorizontal: 12,
     flexDirection: "row",
@@ -115,44 +117,25 @@ const styles = StyleSheet.create({
   },
   subTile: {
     backgroundColor: "#fff",
-    width: "47%", // Чуть меньше половины экрана для отступов
-    aspectRatio: 1.2, // Делает карточки аккуратными прямоугольниками
+    width: "46%",
+    aspectRatio: 1.1,
     padding: 16,
-    borderRadius: 16,
-    marginBottom: 14,
-    marginHorizontal: "1.5%",
+    borderRadius: 20,
+    marginBottom: 16,
+    marginHorizontal: 4,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-    elevation: 1,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
-    shadowRadius: 2,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  subTileEmoji: { fontSize: 26, marginBottom: 8 },
+  subTileEmoji: { fontSize: 28, marginBottom: 10 },
   subTileTitle: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#1a1a1a",
+    fontWeight: "600",
+    color: "#333",
     textAlign: "center",
   },
-
-  infoCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 4,
-  },
-  infoText: { fontSize: 13, color: "#666", lineHeight: 18 },
 });

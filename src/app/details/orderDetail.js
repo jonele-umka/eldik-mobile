@@ -18,6 +18,7 @@ import {
   savePayment,
   saveReturn,
   updateOrderOnServer,
+  updateOrderStatus,
 } from "../../services/api";
 
 export default function OrderDetailScreen() {
@@ -56,7 +57,7 @@ export default function OrderDetailScreen() {
       </View>
     );
   }
-
+  const [status, setStatus] = useState(currentOrder.status || "Новый");
   const [items, setItems] = useState(currentOrder.items || []);
   const [paidAmount, setPaidAmount] = useState(
     Number(currentOrder.paidAmount || 0)
@@ -64,7 +65,31 @@ export default function OrderDetailScreen() {
   const [returnedAmount, setReturnedAmount] = useState(
     Number(currentOrder.returnedAmount || 0)
   );
+  const toggleStatus = async () => {
+    try {
+      setSaving(true);
 
+      const newStatus = status === "Доставлен" ? "Новый" : "Доставлен";
+
+      const response = await updateOrderStatus({
+        orderDate: currentOrder.orderDate,
+        client: currentOrder.client,
+        market: currentOrder.market,
+        status: newStatus,
+      });
+
+      console.log("SERVER RESPONSE", response);
+
+      if (response?.success) {
+        setStatus(newStatus);
+        Alert.alert("Успешно", `Статус изменен на "${newStatus}"`);
+      }
+    } catch (e) {
+      Alert.alert("Ошибка", "Не удалось изменить статус");
+    } finally {
+      setSaving(false);
+    }
+  };
   useEffect(() => {
     async function loadPricesAndMerge() {
       try {
@@ -174,10 +199,10 @@ export default function OrderDetailScreen() {
     try {
       setSaving(true);
       const res = await savePayment({
-        orderDate: currentOrder.orderDate,
         client: currentOrder.client,
-        market: currentOrder.market,
         amount: amount,
+        orderDate: currentOrder.orderDate,
+        market: currentOrder.market,
       });
       if (res && res.success) {
         setPaidAmount((prev) => prev + amount);
@@ -309,10 +334,25 @@ export default function OrderDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#f8f9fa" }}>
       <ScrollView
+        pointerEvents={saving ? "none" : "auto"}
         style={[styles.container, saving && styles.disabledElement]}
         editable={!saving}
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity
+          style={[
+            styles.statusButton,
+            {
+              backgroundColor: status === "Доставлен" ? "#16a34a" : "#f59e0b",
+            },
+          ]}
+          onPress={toggleStatus}
+          disabled={saving}
+        >
+          <Text style={styles.statusButtonText}>
+            {status === "Доставлен" ? "✅ Доставлен" : "🚚 Новый"}
+          </Text>
+        </TouchableOpacity>
         <View style={styles.headerCard}>
           <Text style={styles.clientTitle}>{currentOrder.client}</Text>
           <Text style={styles.orderDateText}>
@@ -717,6 +757,12 @@ export default function OrderDetailScreen() {
           />
         </TouchableOpacity>
       </Modal>
+      {saving && (
+        <View style={styles.globalLoader}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.globalLoaderText}>Загрузка...</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -951,6 +997,37 @@ const styles = StyleSheet.create({
   },
 
   loadingText: {
+    color: "#fff",
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  statusButton: {
+    marginBottom: 15,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  statusButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  globalLoader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 99999,
+    elevation: 99999,
+  },
+
+  globalLoaderText: {
     color: "#fff",
     marginTop: 12,
     fontSize: 16,

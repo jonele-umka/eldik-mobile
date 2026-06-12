@@ -1,5 +1,4 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -13,9 +12,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import PRICES from "../../constants/prices";
-import PRODUCTS from "../../constants/products";
-import { getClients, saveClient, saveOrder } from "../../services/api";
+import {
+  getClients,
+  getPrices,
+  saveClient,
+  saveOrder,
+} from "../../services/api";
 
 export default function CreateOrder() {
   const [market, setMarket] = useState("");
@@ -23,8 +25,13 @@ export default function CreateOrder() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clientsData, setClientsData] = useState({});
+  const [prices, setPrices] = useState({});
+  const [products, setProducts] = useState([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isModalVisible, setModalVisible] = useState(false);
+  const [selectModalVisible, setSelectModalVisible] = useState(false);
+  const [selectType, setSelectType] = useState(""); // market | client
+  const [search, setSearch] = useState("");
   const router = useRouter();
   const [newClient, setNewClient] = useState({
     market: "",
@@ -33,34 +40,77 @@ export default function CreateOrder() {
     phone: "",
   });
   const [isSavingClient, setIsSavingClient] = useState(false);
+  function openMarketModal() {
+    setSelectType("market");
+    setSearch("");
+    setSelectModalVisible(true);
+  }
 
+  function openClientModal() {
+    setSelectType("client");
+    setSearch("");
+    setSelectModalVisible(true);
+  }
   // Внутри CreateOrder.js
   useEffect(() => {
     async function fetchData() {
       setIsDataLoading(true);
+
       try {
-        const data = await getClients();
-        const formatted = data.reduce((acc, client) => {
+        const [clients, pricesData] = await Promise.all([
+          getClients(),
+          getPrices(),
+        ]);
+
+        const formattedClients = clients.reduce((acc, client) => {
           const m = client.market || "Без рынка";
+
           if (!acc[m]) acc[m] = [];
+
           acc[m].push(client.name);
+
           return acc;
         }, {});
 
-        setClientsData(formatted);
+        setClientsData(formattedClients);
 
-        // Инициализируем рынок и клиента, если они пустые
-        const firstMarket = Object.keys(formatted)[0];
+        const firstMarket = Object.keys(formattedClients)[0];
+
         if (firstMarket) {
           setMarket(firstMarket);
-          setClient(formatted[firstMarket][0]);
+          setClient(formattedClients[firstMarket][0]);
         }
+
+        const pricesMap = {};
+        const productsList = [];
+
+        pricesData.forEach((item) => {
+          pricesMap[item.product] = Number(item.price || 0);
+          productsList.push(item.product);
+        });
+        console.log("pricesData", pricesData);
+        console.log("products", productsList);
+        console.log("pricesMap", pricesMap);
+        setPrices(pricesMap);
+        setProducts(productsList);
+
+        const initialItems = {};
+
+        productsList.forEach((product) => {
+          initialItems[product] = {
+            qty: 0,
+            comment: "",
+          };
+        });
+
+        setItems(initialItems);
       } catch (e) {
         console.error(e);
       } finally {
         setIsDataLoading(false);
       }
     }
+
     fetchData();
   }, []);
   const tomorrow = new Date();
@@ -68,15 +118,7 @@ export default function CreateOrder() {
 
   const [deliveryDate, setDeliveryDate] = useState(tomorrow);
 
-  const [items, setItems] = useState(
-    PRODUCTS.reduce((acc, product) => {
-      acc[product] = {
-        qty: 0,
-        comment: "",
-      };
-      return acc;
-    }, {})
-  );
+  const [items, setItems] = useState({});
 
   function handleMarketChange(selectedMarket) {
     setMarket(selectedMarket);
@@ -130,11 +172,20 @@ export default function CreateOrder() {
     return Object.values(items).reduce((sum, item) => sum + item.qty, 0);
   }, [items]);
 
+  function getPrice(product) {
+    const basePrice = prices[product] || 0;
+
+    if (market === "Аламедин") {
+      return basePrice + 20;
+    }
+
+    return basePrice;
+  }
   const totalAmount = useMemo(() => {
     return Object.entries(items).reduce((sum, [product, item]) => {
-      return sum + item.qty * (PRICES[product] || 0);
+      return sum + item.qty * getPrice(product);
     }, 0);
-  }, [items]);
+  }, [items, market]);
   async function handleSave() {
     const orderItems = Object.entries(items)
       .filter(([_, item]) => item.qty > 0)
@@ -146,6 +197,8 @@ export default function CreateOrder() {
           quantity: finalQty,
           paidQuantity: paidQty,
           giftQuantity: giftQty,
+          price: getPrice(product),
+          amount: paidQty * getPrice(product),
           comment: item.comment,
         };
       });
@@ -165,15 +218,16 @@ export default function CreateOrder() {
         items: orderItems,
       });
 
-      setItems(
-        PRODUCTS.reduce((acc, product) => {
-          acc[product] = {
-            qty: 0,
-            comment: "",
-          };
-          return acc;
-        }, {})
-      );
+      const resetItems = {};
+
+      products.forEach((product) => {
+        resetItems[product] = {
+          qty: 0,
+          comment: "",
+        };
+      });
+
+      setItems(resetItems);
 
       Alert.alert("Успех", "Заказ сохранен", [
         {
@@ -227,6 +281,18 @@ export default function CreateOrder() {
       setIsSavingClient(false);
     }
   }
+  const marketList = Object.keys(clientsData).filter((key) => isNaN(key));
+
+  const clientList = (clientsData[market] || []).filter((item) =>
+    item.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const data =
+    selectType === "market"
+      ? marketList.filter((item) =>
+          item.toLowerCase().includes(search.toLowerCase())
+        )
+      : clientList;
   if (isDataLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -235,6 +301,7 @@ export default function CreateOrder() {
       </View>
     );
   }
+
   return (
     <>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -275,55 +342,24 @@ export default function CreateOrder() {
         </TouchableOpacity>
         {/* Выбор рынка */}
         <Text style={styles.label}>Рынок</Text>
-        <View
-          style={[styles.pickerContainer, loading && styles.disabledElement]}
-        >
-          <Picker
-            enabled={!loading}
-            selectedValue={market}
-            onValueChange={handleMarketChange}
-            dropdownIconColor="#1a1a1a"
-            style={{ color: "#1a1a1a" }}
-          >
-            {Object.keys(clientsData)
-              .filter((key) => isNaN(key))
-              .map((m) => (
-                <Picker.Item key={m} label={m} value={m} color="#1a1a1a" />
-              ))}
-          </Picker>
-        </View>
+        <TouchableOpacity style={styles.selectButton} onPress={openMarketModal}>
+          <Text style={styles.selectText}>{market || "Выберите рынок"}</Text>
+        </TouchableOpacity>
 
         {/* Выбор клиента */}
         <Text style={styles.label}>Клиент</Text>
-        <View
-          style={[styles.pickerContainer, loading && styles.disabledElement]}
-        >
-          <Picker
-            enabled={!loading}
-            selectedValue={client}
-            onValueChange={setClient}
-            dropdownIconColor="#1a1a1a"
-            style={{ color: "#1a1a1a" }}
-          >
-            {/* Берем данные из актуального стейта clientsData */}
-            {(clientsData[market] || []).map((name) => (
-              <Picker.Item
-                key={name}
-                label={name}
-                value={name}
-                color="#1a1a1a"
-              />
-            ))}
-          </Picker>
-        </View>
+        <TouchableOpacity style={styles.selectButton} onPress={openClientModal}>
+          <Text style={styles.selectText}>{client || "Выберите клиента"}</Text>
+        </TouchableOpacity>
 
         {/* Список товаров */}
         <Text style={styles.sectionTitle}>Выбор товаров</Text>
 
-        {PRODUCTS.map((product) => {
-          const hasQty = items[product].qty > 0;
-          const promo = calculatePromo(items[product].qty);
+        {products.map((product) => {
+          const item = items[product] || { qty: 0, comment: "" };
 
+          const hasQty = item.qty > 0;
+          const promo = calculatePromo(item.qty);
           return (
             <View
               key={product}
@@ -334,12 +370,18 @@ export default function CreateOrder() {
                   <Text style={styles.productName}>{product}</Text>
 
                   <Text style={styles.productPrice}>
-                    {PRICES[product] || 0} сом / шт
+                    {getPrice(product)} сом / шт
                   </Text>
 
                   {promo.giftQty > 0 && (
-                    <View style={{marginTop: 10}}>
-                      <Text style={{ color: "#22c55e", fontWeight: "700", marginBottom: 5 }}>
+                    <View style={{ marginTop: 10 }}>
+                      <Text
+                        style={{
+                          color: "#22c55e",
+                          fontWeight: "700",
+                          marginBottom: 5,
+                        }}
+                      >
                         🎁 Подарок: {promo.giftQty} шт
                       </Text>
 
@@ -367,8 +409,10 @@ export default function CreateOrder() {
                   {/* ЗАМЕНА TEXT НА TEXTINPUT */}
                   <TextInput
                     style={[styles.qtyInput, hasQty && styles.activeQtyText]}
+                    placeholder="0"
+                    placeholderTextColor="#666"
                     keyboardType="numeric"
-                    value={String(items[product].qty || "")}
+                    value={String(item.qty || "")}
                     onChangeText={(text) => {
                       // Убираем всё, кроме цифр
                       const num = parseInt(text.replace(/[^0-9]/g, "")) || 0;
@@ -402,7 +446,7 @@ export default function CreateOrder() {
                 <TextInput
                   placeholder="Комментарий к товару (размер, замена...)"
                   placeholderTextColor="#999"
-                  value={items[product].comment}
+                  value={item.comment}
                   onChangeText={(text) => changeComment(product, text)}
                   style={[styles.commentInput, loading && styles.disabledInput]}
                   editable={!loading}
@@ -440,7 +484,50 @@ export default function CreateOrder() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      <Modal visible={selectModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.selectModal}>
+            <Text style={styles.sectionTitle}>
+              {selectType === "market" ? "Выберите рынок" : "Выберите клиента"}
+            </Text>
 
+            <TextInput
+              placeholder="Поиск..."
+              placeholderTextColor="#999"
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+            />
+
+            <ScrollView>
+              {data.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.optionItem}
+                  onPress={() => {
+                    if (selectType === "market") {
+                      handleMarketChange(item);
+                    } else {
+                      setClient(item);
+                    }
+
+                    setSelectModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.optionText}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setSelectModalVisible(false)}
+            >
+              <Text>Отмена</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={isModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -449,6 +536,7 @@ export default function CreateOrder() {
             {/* Поле для ввода рынка */}
             <TextInput
               placeholder="Рынок"
+              placeholderTextColor="#666"
               value={newClient.market}
               editable={!isSavingClient} // Блокировка ввода
               onChangeText={(text) =>
@@ -467,7 +555,7 @@ export default function CreateOrder() {
                 .map((m) => (
                   <TouchableOpacity
                     key={m}
-                    disabled={isSavingClient} // Блокировка выбора тага
+                    disabled={isSavingClient}
                     style={[
                       styles.marketTag,
                       isSavingClient && styles.disabledElement,
@@ -481,6 +569,7 @@ export default function CreateOrder() {
 
             <TextInput
               placeholder="Имя клиента"
+              placeholderTextColor="#666"
               value={newClient.name}
               editable={!isSavingClient}
               onChangeText={(text) =>
@@ -490,6 +579,7 @@ export default function CreateOrder() {
             />
             <TextInput
               placeholder="Адрес"
+              placeholderTextColor="#666"
               value={newClient.address}
               editable={!isSavingClient}
               onChangeText={(text) =>
@@ -499,6 +589,7 @@ export default function CreateOrder() {
             />
             <TextInput
               placeholder="Телефон"
+              placeholderTextColor="#666"
               keyboardType="numeric"
               value={newClient.phone}
               editable={!isSavingClient}
@@ -515,7 +606,7 @@ export default function CreateOrder() {
             <TouchableOpacity
               style={[styles.saveBtn, isSavingClient && styles.saveBtnDisabled]}
               onPress={handleSaveClient}
-              disabled={isSavingClient} // Блокировка кнопки
+              disabled={isSavingClient}
             >
               {isSavingClient ? (
                 <ActivityIndicator color="#fff" />
@@ -570,12 +661,12 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
     borderRadius: 14,
     padding: 16,
-    marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    marginBottom: 10,
   },
   dateText: {
     fontSize: 16,
@@ -741,7 +832,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 50,
+    marginBottom: 10,
   },
   saveBtnDisabled: {
     backgroundColor: "#666",
@@ -787,6 +878,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
+    marginTop: 20,
   },
   qtyInput: {
     width: 50,
@@ -798,5 +890,52 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     backgroundColor: "#f8f9fa",
     borderRadius: 8,
+  },
+  selectButton: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  selectText: {
+    color: "#1a1a1a",
+    fontSize: 16,
+  },
+
+  selectModal: {
+    backgroundColor: "#fff",
+    marginTop: 100,
+    marginHorizontal: 20,
+    borderRadius: 20,
+    maxHeight: "70%",
+    padding: 20,
+  },
+
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+    color: "#1a1a1a",
+  },
+
+  optionItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  optionText: {
+    fontSize: 16,
+    color: "#1a1a1a",
+  },
+
+  cancelBtn: {
+    marginTop: 15,
+    alignItems: "center",
   },
 });

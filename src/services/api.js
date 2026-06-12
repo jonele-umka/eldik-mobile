@@ -155,6 +155,32 @@ export async function saveDebtReturn(data) {
 
   return response.data;
 }
+export const updateOrderStatus = async ({
+  orderDate,
+  client,
+  market,
+  status,
+}) => {
+  const res = await axios.post(BASE_URL, {
+    action: "updateStatus",
+    orderDate,
+    client,
+    market,
+    status,
+  });
+
+  return res.data;
+};
+export async function getAnalytics() {
+  const res = await axios.get(`${BASE_URL}?action=analytics`);
+
+  return res.data;
+}
+export const fetchAnalyticsMonths = async () => {
+  const res = await axios.get(`${BASE_URL}?action=analyticsMonths`);
+
+  return res.data;
+};
 // --- СТАРАЯ КЛИЕНТСКАЯ СОВМЕСТИМОСТЬ (Явный экспорт функций для экранов) ---
 export const saveClientOnServer = saveClient;
 export const updateClientOnServer = updateClient;

@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getOrders } from "../../services/api";
+import { fetchFinanceReport, getOrders } from "../../services/api";
 
 export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [orders, setOrders] = useState([]);
-
+  const [finance, setFinance] = useState({});
   const groupOrders = (rawData) => {
     const groups = {};
 
@@ -34,6 +34,7 @@ export default function OrdersScreen() {
           market: market,
           deliveryDate: deliveryDate,
           orderDate: orderDate,
+          status: item.status || "Новый",
           items: [],
           totalSum: 0,
           paidAmount: 0,
@@ -50,15 +51,12 @@ export default function OrdersScreen() {
         comment: item.comment || "",
       });
 
-      // ... внутри цикла forEach в groupOrders
       const itemPaid = Number(item.paidAmount || 0);
       const itemReturned = Number(item.returnedAmount || 0);
 
-      // ИСПРАВЛЕНИЕ: берем максимум, так как сумма возврата дублируется во всех строках заказа
       if (itemPaid > groups[key].paidAmount) groups[key].paidAmount = itemPaid;
       if (itemReturned > groups[key].returnedAmount)
         groups[key].returnedAmount = itemReturned;
-      // ...
 
       const cleanTotal = String(item.total)
         .replace(/[\s\u00a0]/g, "")
@@ -87,10 +85,17 @@ export default function OrdersScreen() {
 
   const loadData = async (isRefreshed = false) => {
     if (!isRefreshed) setLoading(true);
+
     try {
-      const data = await getOrders();
-      if (data && Array.isArray(data)) {
-        setOrders(groupOrders(data));
+      const [ordersData, financeData] = await Promise.all([
+        getOrders(),
+        fetchFinanceReport(),
+      ]);
+
+      setFinance(financeData || {});
+
+      if (ordersData && Array.isArray(ordersData)) {
+        setOrders(groupOrders(ordersData));
       } else {
         setOrders([]);
       }
@@ -136,7 +141,33 @@ export default function OrdersScreen() {
 
   let lastOrderDay = "";
   let lastMarket = "";
+  const totalOrdersSum = orders.reduce((sum, order) => sum + order.totalSum, 0);
 
+  const totalPaidSum = orders.reduce((sum, order) => sum + order.paidAmount, 0);
+  const totalReturnedSum = orders.reduce(
+    (sum, order) => sum + order.returnedAmount,
+    0
+  );
+
+  const totalDebtSum = orders.reduce(
+    (sum, order) =>
+      sum +
+      Math.max(0, order.totalSum - order.returnedAmount - order.paidAmount),
+    0
+  );
+  const netVolume = totalOrdersSum - totalReturnedSum;
+
+  const months = Object.keys(finance || {});
+  const currentMonth = months[months.length - 1];
+
+  let balance = 0;
+
+  if (currentMonth && finance[currentMonth]) {
+    Object.values(finance[currentMonth]).forEach((d) => {
+      balance +=
+        Number(d.income || 0) - Number(d.expense || 0) - Number(d.returns || 0);
+    });
+  }
   return (
     <ScrollView
       style={styles.container}
@@ -152,6 +183,103 @@ export default function OrdersScreen() {
       }
     >
       <Text style={styles.screenTitle}>Список заказов</Text>
+      <View style={styles.summaryContainer}>
+        <View style={styles.grid}>
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Общая сумма заказов</Text>
+            <Text style={[styles.summaryValue, { color: "#2563eb" }]}>
+              {totalOrdersSum.toLocaleString()} сом
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: "#dcfce7", borderColor: "#86efac" },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Оплачено</Text>
+            <Text style={[styles.summaryValue, { color: "#16a34a" }]}>
+              {totalPaidSum.toLocaleString()} сом
+            </Text>
+          </View>
+        </View>
+        <View style={styles.grid}>
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: "#fee2e2", borderColor: "#fca5a5" },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Общий долг</Text>
+            <Text style={[styles.summaryValue, { color: "#dc2626" }]}>
+              {totalDebtSum.toLocaleString()} сом
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Возвраты</Text>
+            <Text style={[styles.summaryValue, { color: "#ea580c" }]}>
+              {totalReturnedSum.toLocaleString()} сом
+            </Text>
+          </View>
+        </View>
+        <View style={styles.grid}>
+          <View
+            style={[
+              styles.summaryCard,
+              {
+                backgroundColor: "#f3e8ff",
+                borderColor: "#c4b5fd",
+              },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Чистый объем</Text>
+
+            <Text
+              style={[
+                styles.summaryValue,
+                {
+                  color: "#7c3aed",
+                },
+              ]}
+            >
+              {netVolume.toLocaleString()} сом
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.summaryCard,
+              {
+                backgroundColor: "#f0fdf4",
+                borderColor: "#86efac",
+              },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Баланс</Text>
+
+            <Text
+              style={[
+                styles.summaryValue,
+                {
+                  color: balance >= 0 ? "#16a34a" : "#dc2626",
+                },
+              ]}
+            >
+              {balance.toLocaleString()} сом
+            </Text>
+          </View>
+        </View>
+      </View>
 
       {orders.length === 0 ? (
         <Text style={styles.emptyText}>Заказы не найдены.</Text>
@@ -188,7 +316,13 @@ export default function OrdersScreen() {
               )}
 
               <TouchableOpacity
-                style={styles.orderCard}
+                style={[
+                  styles.orderCard,
+                  {
+                    borderColor: finStatus.color,
+                    shadowColor: finStatus.color,
+                  },
+                ]}
                 onPress={() =>
                   router.push({
                     pathname: "details/orderDetail",
@@ -198,17 +332,41 @@ export default function OrdersScreen() {
               >
                 <View style={styles.cardHeaderRow}>
                   <Text style={styles.clientText}>{order.client}</Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: finStatus.bg },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.statusText, { color: finStatus.color }]}
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <View
+                      style={{
+                        paddingVertical: 3,
+                        paddingHorizontal: 8,
+                        borderRadius: 6,
+                        backgroundColor:
+                          order.status === "Доставлен" ? "#dcfce7" : "#fef3c7",
+                      }}
                     >
-                      {finStatus.text}
-                    </Text>
+                      <Text
+                        style={{
+                          color:
+                            order.status === "Доставлен"
+                              ? "#16a34a"
+                              : "#d97706",
+                          fontSize: 11,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {order.status}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: finStatus.bg },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.statusText, { color: finStatus.color }]}
+                      >
+                        {finStatus.text}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -297,10 +455,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
+
     borderWidth: 1,
     borderColor: "#e9ecef",
+
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+
+    elevation: 5,
   },
   cardHeaderRow: {
+    marginBottom: 5,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -336,4 +505,34 @@ const styles = StyleSheet.create({
   finValue: { fontSize: 13, fontWeight: "700", color: "#1a1a1a" },
   statusBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
   statusText: { fontSize: 11, fontWeight: "700" },
+  summaryContainer: {
+    marginBottom: 20,
+  },
+  grid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  summaryCard: {
+    flex: 1,
+    minHeight: 50,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: "800",
+  },
 });

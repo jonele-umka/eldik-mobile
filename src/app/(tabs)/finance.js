@@ -107,6 +107,8 @@ export default function FinanceScreen() {
                 totalReturns += monthData[day].returns || 0;
               });
 
+              const finalVolume = totalVolume - totalReturns - totalExpense;
+
               const balance = totalIncome - totalExpense - totalReturns;
 
               return (
@@ -136,6 +138,13 @@ export default function FinanceScreen() {
                       <Text style={styles.label}>Возврат</Text>
                       <Text style={[styles.value, { color: "#d97706" }]}>
                         {totalReturns.toLocaleString()} сом
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.label}>Чистый объем</Text>
+                      <Text style={[styles.value, { color: "#7c3aed" }]}>
+                        {finalVolume.toLocaleString()} сом
                       </Text>
                     </View>
                     <View style={[styles.summaryRow, styles.totalRow]}>

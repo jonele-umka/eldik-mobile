@@ -25,10 +25,10 @@ export default function RootLayout() {
         name="homeScreen/debtorsScreen"
         options={{ headerShown: true, title: "Журнал должников" }}
       />
-      <Stack.Screen
+      {/* <Stack.Screen
         name="homeScreen/paymentScreen"
         options={{ headerShown: true, title: "Внести платеж" }}
-      />
+      /> */}
       <Stack.Screen
         name="homeScreen/returnsScreen"
         options={{ headerShown: true, title: "Оформить возврат" }}
@@ -36,6 +36,10 @@ export default function RootLayout() {
       <Stack.Screen
         name="homeScreen/expensesScreen"
         options={{ headerShown: true, title: "Расходы" }}
+      />
+      <Stack.Screen
+        name="homeScreen/reportsScreen"
+        options={{ headerShown: true, title: "Отчеты" }}
       />
 
       {/* Группа деталей */}
