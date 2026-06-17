@@ -30,7 +30,7 @@ export default function CreateOrder() {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectModalVisible, setSelectModalVisible] = useState(false);
-  const [selectType, setSelectType] = useState(""); // market | client
+  const [selectType, setSelectType] = useState("");
   const [search, setSearch] = useState("");
   const router = useRouter();
   const [newClient, setNewClient] = useState({
@@ -40,6 +40,7 @@ export default function CreateOrder() {
     phone: "",
   });
   const [isSavingClient, setIsSavingClient] = useState(false);
+
   function openMarketModal() {
     setSelectType("market");
     setSearch("");
@@ -51,11 +52,10 @@ export default function CreateOrder() {
     setSearch("");
     setSelectModalVisible(true);
   }
-  // Внутри CreateOrder.js
+
   useEffect(() => {
     async function fetchData() {
       setIsDataLoading(true);
-
       try {
         const [clients, pricesData] = await Promise.all([
           getClients(),
@@ -64,18 +64,14 @@ export default function CreateOrder() {
 
         const formattedClients = clients.reduce((acc, client) => {
           const m = client.market || "Без рынка";
-
           if (!acc[m]) acc[m] = [];
-
           acc[m].push(client.name);
-
           return acc;
         }, {});
 
         setClientsData(formattedClients);
 
         const firstMarket = Object.keys(formattedClients)[0];
-
         if (firstMarket) {
           setMarket(firstMarket);
           setClient(formattedClients[firstMarket][0]);
@@ -88,21 +84,14 @@ export default function CreateOrder() {
           pricesMap[item.product] = Number(item.price || 0);
           productsList.push(item.product);
         });
-        console.log("pricesData", pricesData);
-        console.log("products", productsList);
-        console.log("pricesMap", pricesMap);
+
         setPrices(pricesMap);
         setProducts(productsList);
 
         const initialItems = {};
-
         productsList.forEach((product) => {
-          initialItems[product] = {
-            qty: 0,
-            comment: "",
-          };
+          initialItems[product] = { qty: 0, comment: "" };
         });
-
         setItems(initialItems);
       } catch (e) {
         console.error(e);
@@ -113,16 +102,15 @@ export default function CreateOrder() {
 
     fetchData();
   }, []);
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const [deliveryDate, setDeliveryDate] = useState(tomorrow);
-
   const [items, setItems] = useState({});
 
   function handleMarketChange(selectedMarket) {
     setMarket(selectedMarket);
-
     const marketClients = clientsData[selectedMarket] || [];
     setClient(marketClients[0] || "");
   }
@@ -131,10 +119,7 @@ export default function CreateOrder() {
     if (loading) return;
     setItems((prev) => ({
       ...prev,
-      [product]: {
-        ...prev[product],
-        qty: prev[product].qty + 1,
-      },
+      [product]: { ...prev[product], qty: prev[product].qty + 1 },
     }));
   }
 
@@ -148,23 +133,21 @@ export default function CreateOrder() {
       },
     }));
   }
+
   function calculatePromo(qty) {
     const giftQty = Math.floor(qty / 10);
-
     return {
       giftQty,
       finalQty: qty + giftQty,
       paidQty: qty,
     };
   }
+
   function changeComment(product, text) {
     if (loading) return;
     setItems((prev) => ({
       ...prev,
-      [product]: {
-        ...prev[product],
-        comment: text,
-      },
+      [product]: { ...prev[product], comment: text },
     }));
   }
 
@@ -174,18 +157,16 @@ export default function CreateOrder() {
 
   function getPrice(product) {
     const basePrice = prices[product] || 0;
-
-    if (market === "Аламедин") {
-      return basePrice + 20;
-    }
-
-    return basePrice;
+    return market === "Аламедин" ? basePrice + 20 : basePrice;
   }
+
   const totalAmount = useMemo(() => {
     return Object.entries(items).reduce((sum, [product, item]) => {
       return sum + item.qty * getPrice(product);
     }, 0);
   }, [items, market]);
+
+  // ✅ ИСПРАВЛЕННЫЙ handleSave
   async function handleSave() {
     const orderItems = Object.entries(items)
       .filter(([_, item]) => item.qty > 0)
@@ -194,11 +175,11 @@ export default function CreateOrder() {
 
         return {
           product,
-          quantity: finalQty,
-          paidQuantity: paidQty,
-          giftQuantity: giftQty,
+          quantity: paidQty, // ✅ чистое количество без подарков
+          paidQuantity: paidQty, // ✅
+          giftQty: giftQty, // ✅ правильное поле (было giftQuantity)
+          finalQuantity: finalQty, // ✅ добавлено
           price: getPrice(product),
-          amount: paidQty * getPrice(product),
           comment: item.comment,
         };
       });
@@ -208,34 +189,31 @@ export default function CreateOrder() {
       return;
     }
 
+    // ✅ надёжный формат даты dd.MM.yyyy
+    const d = deliveryDate;
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    const formattedDate = `${day}.${month}.${year}`;
+
     try {
       setLoading(true);
 
-      await saveOrder({
+      const res = await saveOrder({
         client,
         market,
-        deliveryDate: deliveryDate.toLocaleDateString("ru-RU"),
+        deliveryDate: formattedDate,
         items: orderItems,
       });
 
       const resetItems = {};
-
       products.forEach((product) => {
-        resetItems[product] = {
-          qty: 0,
-          comment: "",
-        };
+        resetItems[product] = { qty: 0, comment: "" };
       });
-
       setItems(resetItems);
 
       Alert.alert("Успех", "Заказ сохранен", [
-        {
-          text: "ОК",
-          onPress: () => {
-            router.replace("/home");
-          },
-        },
+        { text: "ОК", onPress: () => router.replace("/home") },
       ]);
     } catch (e) {
       console.log(e);
@@ -244,6 +222,7 @@ export default function CreateOrder() {
       setLoading(false);
     }
   }
+
   async function handleSaveClient() {
     if (!newClient.market || !newClient.name) {
       Alert.alert("Ошибка", "Заполните рынок и имя");
@@ -252,15 +231,12 @@ export default function CreateOrder() {
 
     setIsSavingClient(true);
     try {
-      // Вызываем импортированную функцию из api.js
       const response = await saveClient(newClient);
 
-      // Проверяем, что вернул сервер (зависит от того, как написан GAS)
       if (response && response.success === false) {
         throw new Error(response.error || "Ошибка сохранения");
       }
 
-      // Обновляем список клиентов
       const rawData = await getClients();
       const formatted = rawData.reduce((acc, client) => {
         const m = client.market || "Без рынка";
@@ -270,7 +246,6 @@ export default function CreateOrder() {
       }, {});
 
       setClientsData(formatted);
-
       setModalVisible(false);
       setNewClient({ market: "", name: "", address: "", phone: "" });
       Alert.alert("Успех", "Клиент добавлен");
@@ -281,6 +256,7 @@ export default function CreateOrder() {
       setIsSavingClient(false);
     }
   }
+
   const marketList = Object.keys(clientsData).filter((key) => isNaN(key));
 
   const clientList = (clientsData[market] || []).filter((item) =>
@@ -293,6 +269,7 @@ export default function CreateOrder() {
           item.toLowerCase().includes(search.toLowerCase())
         )
       : clientList;
+
   if (isDataLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -307,7 +284,6 @@ export default function CreateOrder() {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Новый заказ</Text>
 
-        {/* Выбор даты */}
         <Text style={styles.label}>Дата доставки</Text>
         <TouchableOpacity
           disabled={loading}
@@ -326,12 +302,11 @@ export default function CreateOrder() {
             minimumDate={new Date()}
             onChange={(event, selectedDate) => {
               setShowDatePicker(false);
-              if (selectedDate) {
-                setDeliveryDate(selectedDate);
-              }
+              if (selectedDate) setDeliveryDate(selectedDate);
             }}
           />
         )}
+
         <TouchableOpacity
           style={styles.addClient}
           onPress={() => setModalVisible(true)}
@@ -340,26 +315,24 @@ export default function CreateOrder() {
             Добавить клиент
           </Text>
         </TouchableOpacity>
-        {/* Выбор рынка */}
+
         <Text style={styles.label}>Рынок</Text>
         <TouchableOpacity style={styles.selectButton} onPress={openMarketModal}>
           <Text style={styles.selectText}>{market || "Выберите рынок"}</Text>
         </TouchableOpacity>
 
-        {/* Выбор клиента */}
         <Text style={styles.label}>Клиент</Text>
         <TouchableOpacity style={styles.selectButton} onPress={openClientModal}>
           <Text style={styles.selectText}>{client || "Выберите клиента"}</Text>
         </TouchableOpacity>
 
-        {/* Список товаров */}
         <Text style={styles.sectionTitle}>Выбор товаров</Text>
 
         {products.map((product) => {
           const item = items[product] || { qty: 0, comment: "" };
-
           const hasQty = item.qty > 0;
           const promo = calculatePromo(item.qty);
+
           return (
             <View
               key={product}
@@ -368,11 +341,9 @@ export default function CreateOrder() {
               <View style={styles.topRow}>
                 <View style={styles.productInfo}>
                   <Text style={styles.productName}>{product}</Text>
-
                   <Text style={styles.productPrice}>
                     {getPrice(product)} сом / шт
                   </Text>
-
                   {promo.giftQty > 0 && (
                     <View style={{ marginTop: 10 }}>
                       <Text
@@ -384,7 +355,6 @@ export default function CreateOrder() {
                       >
                         🎁 Подарок: {promo.giftQty} шт
                       </Text>
-
                       <Text style={{ color: "#666" }}>
                         Итого выдача: {promo.finalQty} шт
                       </Text>
@@ -406,7 +376,6 @@ export default function CreateOrder() {
                     <Text style={styles.counterBtnText}>-</Text>
                   </TouchableOpacity>
 
-                  {/* ЗАМЕНА TEXT НА TEXTINPUT */}
                   <TextInput
                     style={[styles.qtyInput, hasQty && styles.activeQtyText]}
                     placeholder="0"
@@ -414,14 +383,10 @@ export default function CreateOrder() {
                     keyboardType="numeric"
                     value={String(item.qty || "")}
                     onChangeText={(text) => {
-                      // Убираем всё, кроме цифр
                       const num = parseInt(text.replace(/[^0-9]/g, "")) || 0;
                       setItems((prev) => ({
                         ...prev,
-                        [product]: {
-                          ...prev[product],
-                          qty: num,
-                        },
+                        [product]: { ...prev[product], qty: num },
                       }));
                     }}
                     editable={!loading}
@@ -441,7 +406,6 @@ export default function CreateOrder() {
                 </View>
               </View>
 
-              {/* Инпут комментария внутри карточки товара */}
               {hasQty && (
                 <TextInput
                   placeholder="Комментарий к товару (размер, замена...)"
@@ -456,13 +420,11 @@ export default function CreateOrder() {
           );
         })}
 
-        {/* Блок итогов */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Всего коробок:</Text>
             <Text style={styles.summaryValue}>{totalBoxes} шт</Text>
           </View>
-
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Общая сумма:</Text>
             <Text style={styles.totalValue}>
@@ -471,7 +433,6 @@ export default function CreateOrder() {
           </View>
         </View>
 
-        {/* Кнопка сохранения */}
         <TouchableOpacity
           disabled={loading}
           style={[styles.saveBtn, loading && styles.saveBtnDisabled]}
@@ -484,13 +445,14 @@ export default function CreateOrder() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Модалка выбора рынка / клиента */}
       <Modal visible={selectModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.selectModal}>
             <Text style={styles.sectionTitle}>
               {selectType === "market" ? "Выберите рынок" : "Выберите клиента"}
             </Text>
-
             <TextInput
               placeholder="Поиск..."
               placeholderTextColor="#999"
@@ -498,7 +460,6 @@ export default function CreateOrder() {
               onChangeText={setSearch}
               style={styles.searchInput}
             />
-
             <ScrollView>
               {data.map((item) => (
                 <TouchableOpacity
@@ -510,7 +471,6 @@ export default function CreateOrder() {
                     } else {
                       setClient(item);
                     }
-
                     setSelectModalVisible(false);
                   }}
                 >
@@ -518,7 +478,6 @@ export default function CreateOrder() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-
             <TouchableOpacity
               style={styles.cancelBtn}
               onPress={() => setSelectModalVisible(false)}
@@ -528,17 +487,18 @@ export default function CreateOrder() {
           </View>
         </View>
       </Modal>
+
+      {/* Модалка добавления клиента */}
       <Modal visible={isModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.sectionTitle}>Новый клиент</Text>
 
-            {/* Поле для ввода рынка */}
             <TextInput
               placeholder="Рынок"
               placeholderTextColor="#666"
               value={newClient.market}
-              editable={!isSavingClient} // Блокировка ввода
+              editable={!isSavingClient}
               onChangeText={(text) =>
                 setNewClient({ ...newClient, market: text })
               }
@@ -602,7 +562,6 @@ export default function CreateOrder() {
               style={[styles.input, isSavingClient && styles.disabledInput]}
             />
 
-            {/* Кнопка Сохранить */}
             <TouchableOpacity
               style={[styles.saveBtn, isSavingClient && styles.saveBtnDisabled]}
               onPress={handleSaveClient}
@@ -615,7 +574,6 @@ export default function CreateOrder() {
               )}
             </TouchableOpacity>
 
-            {/* Кнопка Отмена */}
             <TouchableOpacity
               disabled={isSavingClient}
               onPress={() => setModalVisible(false)}
@@ -638,6 +596,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
     paddingHorizontal: 16,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
@@ -668,24 +627,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 10,
   },
-  dateText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1a1a1a",
-  },
-  pickerContainer: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-    borderRadius: 14,
-    marginBottom: 20,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
+  dateText: { fontSize: 16, fontWeight: "600", color: "#1a1a1a" },
   sectionTitle: {
     fontSize: 22,
     fontWeight: "800",
@@ -716,10 +658,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  productInfo: {
-    flex: 1,
-    paddingRight: 10,
-  },
+  productInfo: { flex: 1, paddingRight: 10 },
   productName: {
     fontSize: 16,
     fontWeight: "700",
@@ -727,15 +666,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     flexShrink: 1,
   },
-  productPrice: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#888",
-  },
-  counterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  productPrice: { fontSize: 13, fontWeight: "600", color: "#888" },
+  counterContainer: { flexDirection: "row", alignItems: "center" },
   counterBtn: {
     width: 36,
     height: 36,
@@ -743,32 +675,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  minusBtn: {
-    backgroundColor: "#fee2e2",
-  },
-  plusBtn: {
-    backgroundColor: "#dcfce7",
-  },
-  counterBtnText: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  inactiveBtn: {
-    backgroundColor: "#f1f3f5",
-    opacity: 0.5,
-  },
-  qtyText: {
-    width: 40,
+  minusBtn: { backgroundColor: "#fee2e2" },
+  plusBtn: { backgroundColor: "#dcfce7" },
+  counterBtnText: { fontSize: 20, fontWeight: "700" },
+  inactiveBtn: { backgroundColor: "#f1f3f5", opacity: 0.5 },
+  qtyInput: {
+    width: 50,
     textAlign: "center",
     fontSize: 16,
     fontWeight: "600",
-    color: "#888",
-  },
-  activeQtyText: {
-    fontWeight: "800",
     color: "#1a1a1a",
-    fontSize: 18,
+    paddingVertical: 5,
+    marginHorizontal: 4,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
   },
+  activeQtyText: { fontWeight: "800", color: "#1a1a1a", fontSize: 18 },
   commentInput: {
     marginTop: 12,
     backgroundColor: "#fff",
@@ -784,9 +706,7 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
     color: "#999",
   },
-  disabledElement: {
-    opacity: 0.5,
-  },
+  disabledElement: { opacity: 0.5 },
   summaryCard: {
     backgroundColor: "#1a1a1a",
     borderRadius: 20,
@@ -800,32 +720,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  summaryLabel: {
-    color: "#abb2bf",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  summaryValue: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  summaryLabel: { color: "#abb2bf", fontSize: 14, fontWeight: "600" },
+  summaryValue: { color: "#fff", fontSize: 16, fontWeight: "700" },
   totalRow: {
     borderTopWidth: 1,
     borderColor: "#333",
     paddingTop: 12,
     marginBottom: 0,
   },
-  totalLabel: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  totalValue: {
-    color: "#22c55e",
-    fontSize: 22,
-    fontWeight: "800",
-  },
+  totalLabel: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  totalValue: { color: "#22c55e", fontSize: 22, fontWeight: "800" },
   saveBtn: {
     backgroundColor: "#1a1a1a",
     padding: 18,
@@ -834,15 +738,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-  saveBtnDisabled: {
-    backgroundColor: "#666",
-    opacity: 0.7,
-  },
-  saveText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  saveBtnDisabled: { backgroundColor: "#666", opacity: 0.7 },
+  saveText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -880,17 +777,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 20,
   },
-  qtyInput: {
-    width: 50,
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1a1a1a",
-    paddingVertical: 5,
-    marginHorizontal: 4,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 8,
-  },
   selectButton: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -899,12 +785,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
-
-  selectText: {
-    color: "#1a1a1a",
-    fontSize: 16,
-  },
-
+  selectText: { color: "#1a1a1a", fontSize: 16 },
   selectModal: {
     backgroundColor: "#fff",
     marginTop: 100,
@@ -913,7 +794,6 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     padding: 20,
   },
-
   searchInput: {
     borderWidth: 1,
     borderColor: "#ddd",
@@ -922,20 +802,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#1a1a1a",
   },
-
   optionItem: {
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-
-  optionText: {
-    fontSize: 16,
-    color: "#1a1a1a",
-  },
-
-  cancelBtn: {
-    marginTop: 15,
-    alignItems: "center",
-  },
+  optionText: { fontSize: 16, color: "#1a1a1a" },
+  cancelBtn: { marginTop: 15, alignItems: "center" },
 });

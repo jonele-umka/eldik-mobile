@@ -20,17 +20,13 @@ export async function updateOrderOnServer(updatedOrderData) {
   });
   return res.data;
 }
-export const deleteOrder = async (client, orderDate) => {
-  const response = await fetch(BASE_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "deleteOrder",
-      client,
-      orderDate,
-    }),
+export const deleteOrder = async (orderId) => {
+  const response = await axios.post(BASE_URL, {
+    action: "deleteOrder",
+    orderId,
   });
 
-  return response.json();
+  return response.data;
 };
 export async function getOrders() {
   const res = await axios.get(`${BASE_URL}?action=orders&_t=${Date.now()}`);
@@ -63,13 +59,8 @@ export async function getDebtors() {
 }
 
 export async function getProduction() {
-  const res = await axios.get(`${BASE_URL}?action=production&t=${Date.now()}`);
+  const res = await axios.get(`${BASE_URL}?action=production&_t=${Date.now()}`);
 
-  return res.data;
-}
-
-export async function getFinance() {
-  const res = await axios.get(`${BASE_URL}?action=finance&_t=${Date.now()}`);
   return res.data;
 }
 
@@ -120,20 +111,19 @@ export const getPrices = async () => {
   }
 };
 export async function getExpenses() {
-  const response = await fetch(`${BASE_URL}?action=expenses`);
-  return response.json();
+  const res = await axios.get(`${BASE_URL}?action=expenses&_t=${Date.now()}`);
+  return res.data;
 }
+
 export async function saveExpense(data) {
-  const response = await fetch(BASE_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "saveExpense",
-      category: data.category,
-      amount: data.amount,
-    }),
+  const res = await axios.post(BASE_URL, {
+    action: "saveExpense",
+    category: data.category,
+    amount: data.amount,
+    market: data.market,
+    comment: data.comment,
   });
-  return response.json();
+  return res.data;
 }
 // Получение списка всех платежей
 export async function getPayments() {
@@ -155,17 +145,10 @@ export async function saveDebtReturn(data) {
 
   return response.data;
 }
-export const updateOrderStatus = async ({
-  orderDate,
-  client,
-  market,
-  status,
-}) => {
+export const updateOrderStatus = async ({ orderId, status }) => {
   const res = await axios.post(BASE_URL, {
     action: "updateStatus",
-    orderDate,
-    client,
-    market,
+    orderId,
     status,
   });
 
@@ -181,6 +164,17 @@ export const fetchAnalyticsMonths = async () => {
 
   return res.data;
 };
+export async function addOrderRow(data) {
+  const res = await axios.post(BASE_URL, {
+    action: "addOrderRow",
+    ...data,
+  });
+  return res.data;
+}
+export async function getReturns() {
+  const res = await axios.get(`${BASE_URL}?action=returns&_t=${Date.now()}`);
+  return res.data;
+}
 // --- СТАРАЯ КЛИЕНТСКАЯ СОВМЕСТИМОСТЬ (Явный экспорт функций для экранов) ---
 export const saveClientOnServer = saveClient;
 export const updateClientOnServer = updateClient;

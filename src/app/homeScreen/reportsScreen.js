@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { fetchAnalyticsMonths } from "../../services/api";
+import { fetchAnalyticsMonths, getAnalytics } from "../../services/api";
 
 const MONTHS = {
   "01": "Январь",

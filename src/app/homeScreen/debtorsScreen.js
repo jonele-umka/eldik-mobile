@@ -11,62 +11,77 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import CLIENTS from "../../constants/clients"; // Импортируем для поиска связи клиент -> рынок
-import MARKETS from "../../constants/markets"; // Импортируем массив рынков
-import { getDebtors, saveDebtReturn, savePayment } from "../../services/api";
+import {
+  getClients,
+  getDebtors,
+  getOrders,
+  getReturns,
+  saveDebtReturn,
+  savePayment,
+} from "../../services/api";
 
 export default function DebtorsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const [groupedDebtors, setGroupedDebtors] = useState({});
 
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [returnModalVisible, setReturnModalVisible] = useState(false);
 
   const [selectedDebtor, setSelectedDebtor] = useState(null);
-
   const [paymentAmount, setPaymentAmount] = useState("");
-  const [returnAmount, setReturnAmount] = useState("");
+
+  const [clientItems, setClientItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [selectedReturnProduct, setSelectedReturnProduct] = useState(null);
+  const [returnQuantity, setReturnQuantity] = useState("1");
 
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [returnLoading, setReturnLoading] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
 
+  async function reloadAfterAction() {
+    setReloading(true);
+    await loadData();
+    setReloading(false);
+  }
+
   async function loadData() {
     try {
-      const data = await getDebtors();
-console.log(data)
-      // Убедитесь, что data - это массив
-      const onlyDebtors = (Array.isArray(data) ? data : Object.values(data))
-        .filter((item) => Math.round(item.debt) > 0)
-        .sort((a, b) => Number(b.debt) - Number(a.debt));
-      // 1. Фильтруем только должников и сортируем по убыванию суммы долга
+      const [debtorsData, clientsData] = await Promise.all([
+        getDebtors(),
+        getClients(),
+      ]);
 
-      // 2. Инициализируем группы на основе официального массива MARKETS
-      const grouped = {};
-      MARKETS.forEach((marketName) => {
-        grouped[marketName] = [];
+      const clientToMarket = {};
+      (Array.isArray(clientsData) ? clientsData : []).forEach((c) => {
+        if (c.name && c.market) {
+          clientToMarket[c.name.trim().toLowerCase()] = c.market;
+        }
       });
-      // Для клиентов, чей рынок определить не удалось
+
+      const marketSet = new Set(Object.values(clientToMarket));
+      const grouped = {};
+      marketSet.forEach((m) => {
+        grouped[m] = [];
+      });
       grouped["Другие рынки"] = [];
 
-      // 3. Распределяем должников по рынкам, используя структуру CLIENTS
+      const onlyDebtors = (
+        Array.isArray(debtorsData) ? debtorsData : Object.values(debtorsData)
+      )
+        .filter((item) => Math.round(item.debt) > 0)
+        .sort((a, b) => Number(b.debt) - Number(a.debt));
+
       onlyDebtors.forEach((item) => {
-        // Ищем, к какому рынку принадлежит данный клиент в constants/clients.js
-        let foundMarket = "Другие рынки";
-
-        for (const [marketName, clientList] of Object.entries(CLIENTS)) {
-          if (clientList.includes(item.client)) {
-            foundMarket = marketName;
-            break;
-          }
-        }
-
-        // Добавляем должника в соответствующую группу
-        grouped[foundMarket].push(item);
+        const market =
+          clientToMarket[item.client.trim().toLowerCase()] || "Другие рынки";
+        if (!grouped[market]) grouped[market] = [];
+        grouped[market].push({ ...item, market });
       });
 
       setGroupedDebtors(grouped);
@@ -77,9 +92,9 @@ console.log(data)
       setRefreshing(false);
     }
   }
+
   const handlePayment = async () => {
     const amount = Number(paymentAmount);
-
     if (!amount || amount <= 0) {
       Alert.alert("Ошибка", "Введите сумму");
       return;
@@ -88,20 +103,21 @@ console.log(data)
     try {
       setPaymentLoading(true);
 
+      const rawDate = selectedDebtor.lastOrderDate || "";
+      const orderDate = rawDate.split(" ")[0];
+
       const res = await savePayment({
         client: selectedDebtor.client,
         amount,
-        orderDate: selectedDebtor.lastOrderDate,
+        orderDate,
         market: selectedDebtor.market,
       });
 
       if (res.success) {
         Alert.alert("Успешно", "Оплата проведена");
-
         setPaymentModalVisible(false);
         setPaymentAmount("");
-
-        await loadData();
+        await reloadAfterAction();
       }
     } catch (e) {
       Alert.alert("Ошибка", "Не удалось сохранить оплату");
@@ -110,13 +126,87 @@ console.log(data)
     }
   };
 
-  const handleReturn = async () => {
-    const amount = Number(returnAmount);
+  const openReturnModal = async (item) => {
+    setSelectedDebtor(item);
+    setSelectedReturnProduct(null);
+    setReturnQuantity("1");
+    setReturnModalVisible(true);
+    setItemsLoading(true);
+    try {
+      // Грузим заказы и возвраты параллельно
+      const [allOrders, allReturns] = await Promise.all([
+        getOrders(),
+        getReturns(),
+      ]);
 
-    if (!amount || amount <= 0) {
-      Alert.alert("Ошибка", "Введите сумму");
+      const clientName = item.client.trim().toLowerCase();
+
+      // Считаем сколько каждого товара уже вернули этот клиент
+      const returnedMap = {}; // { product: totalReturnedQty }
+      (Array.isArray(allReturns) ? allReturns : [])
+        .filter((r) => r.client?.trim().toLowerCase() === clientName)
+        .forEach((r) => {
+          const p = r.product?.trim();
+          if (!p || p === "Возврат долга") return;
+          returnedMap[p] = (returnedMap[p] || 0) + Number(r.quantity || 0);
+        });
+
+      // Суммируем заказанное количество по каждому товару
+      const orderedMap = {}; // { product: { totalQty, price } }
+      (Array.isArray(allOrders) ? allOrders : [])
+        .filter(
+          (o) => o.client?.trim().toLowerCase() === clientName && o.product
+        )
+        .forEach((o) => {
+          const p = o.product.trim();
+          if (!orderedMap[p]) {
+            orderedMap[p] = { totalQty: 0, price: o.price };
+          }
+          orderedMap[p].totalQty += Number(o.quantity || 0);
+        });
+
+      // Строим итоговый список товаров с остатком для возврата
+      const items = Object.entries(orderedMap)
+        .map(([product, data]) => {
+          const alreadyReturned = returnedMap[product] || 0;
+          const remaining = data.totalQty - alreadyReturned;
+          return {
+            product,
+            price: data.price,
+            totalQty: data.totalQty,
+            alreadyReturned,
+            remaining, // сколько ещё можно вернуть
+          };
+        })
+        .filter((p) => p.remaining > 0); // скрываем полностью возвращённые
+
+      setClientItems(items);
+    } catch (e) {
+      console.log(e);
+      setClientItems([]);
+    } finally {
+      setItemsLoading(false);
+    }
+  };
+
+  const handleReturn = async () => {
+    if (!selectedReturnProduct) {
+      Alert.alert("Ошибка", "Выберите товар");
       return;
     }
+    const qty = parseInt(returnQuantity);
+    if (!qty || qty <= 0) {
+      Alert.alert("Ошибка", "Введите количество");
+      return;
+    }
+    if (qty > selectedReturnProduct.remaining) {
+      Alert.alert(
+        "Ошибка",
+        `Можно вернуть не более ${selectedReturnProduct.remaining} шт`
+      );
+      return;
+    }
+    const amount = qty * Number(selectedReturnProduct.price);
 
     try {
       setReturnLoading(true);
@@ -124,16 +214,18 @@ console.log(data)
       const res = await saveDebtReturn({
         client: selectedDebtor.client,
         market: selectedDebtor.market,
+        product: selectedReturnProduct.product,
+        quantity: qty,
+        price: Number(selectedReturnProduct.price),
         amount,
       });
 
       if (res.success) {
         Alert.alert("Успешно", "Возврат оформлен");
-
         setReturnModalVisible(false);
-        setReturnAmount("");
-
-        await loadData();
+        setSelectedReturnProduct(null);
+        setReturnQuantity("1");
+        await reloadAfterAction();
       }
     } catch (e) {
       Alert.alert("Ошибка", "Не удалось оформить возврат");
@@ -141,6 +233,7 @@ console.log(data)
       setReturnLoading(false);
     }
   };
+
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
@@ -154,7 +247,6 @@ console.log(data)
     );
   }
 
-  // Выводим только те рынки, где реально есть хотя бы один должник
   const marketsToRender = Object.keys(groupedDebtors).filter(
     (marketName) => groupedDebtors[marketName].length > 0
   );
@@ -165,12 +257,7 @@ console.log(data)
         style={styles.container}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#1a1a1a"]}
-            tintColor="#1a1a1a"
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         <Text style={styles.title}>Должники</Text>
@@ -184,12 +271,13 @@ console.log(data)
         ) : (
           marketsToRender.map((marketName) => (
             <View key={marketName} style={styles.marketSection}>
-              {/* Красивый заголовок рынка */}
               <Text style={styles.marketHeaderTitle}>📍 {marketName}</Text>
 
-              {/* Список должников внутри конкретного рынка */}
-              {groupedDebtors[marketName].map((item, index) => (
-                <View key={index} style={[styles.card, styles.activeDebtCard]}>
+              {groupedDebtors[marketName].map((item) => (
+                <View
+                  key={item.client}
+                  style={[styles.card, styles.activeDebtCard]}
+                >
                   <View style={styles.cardHeader}>
                     <Text style={styles.name}>👤 {item.client}</Text>
                     <Text style={styles.miniDebtBadge}>
@@ -257,11 +345,7 @@ console.log(data)
                           marginLeft: 6,
                           alignItems: "center",
                         }}
-                        onPress={() => {
-                          setSelectedDebtor(item);
-                          setReturnAmount("");
-                          setReturnModalVisible(true);
-                        }}
+                        onPress={() => openReturnModal(item)}
                       >
                         <Text style={{ color: "#fff", fontWeight: "700" }}>
                           🔄 Возврат
@@ -269,6 +353,7 @@ console.log(data)
                       </TouchableOpacity>
                     </View>
                   </View>
+
                   <View>
                     <Text style={styles.debtLabel}>Остаток долга:</Text>
                     <Text style={[styles.debtValue, styles.textRed]}>
@@ -282,18 +367,19 @@ console.log(data)
         )}
 
         <View style={styles.spacer} />
+
+        {/* Модалка оплаты */}
         <Modal
           visible={paymentModalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => {}}
+          onRequestClose={() => setPaymentModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
                 Оплата: {selectedDebtor?.client}
               </Text>
-
               <TextInput
                 style={styles.moneyInput}
                 keyboardType="numeric"
@@ -313,28 +399,20 @@ console.log(data)
                     paddingHorizontal: 20,
                     borderRadius: 8,
                     alignItems: "center",
-                    justifyContent: "center",
                     marginTop: 10,
                   }}
                 >
                   <Text
-                    style={{
-                      color: "#ffffff",
-                      fontWeight: "bold",
-                      fontSize: 16,
-                    }}
+                    style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}
                   >
                     Сохранить оплату
                   </Text>
                 </TouchableOpacity>
               )}
-
               <TouchableOpacity
                 style={styles.cancelBtn}
                 disabled={paymentLoading}
                 onPress={() => {
-                  if (paymentLoading) return;
-
                   setPaymentModalVisible(false);
                   setPaymentAmount("");
                 }}
@@ -344,11 +422,15 @@ console.log(data)
             </View>
           </View>
         </Modal>
+
+        {/* Модалка возврата */}
         <Modal
           visible={returnModalVisible}
           transparent
           animationType="fade"
-          onRequestClose={() => {}}
+          onRequestClose={() => {
+            if (!returnLoading) setReturnModalVisible(false);
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
@@ -356,35 +438,122 @@ console.log(data)
                 Возврат: {selectedDebtor?.client}
               </Text>
 
-              <TextInput
-                style={styles.moneyInput}
-                keyboardType="numeric"
-                placeholder="Сумма возврата"
-                value={returnAmount}
-                onChangeText={setReturnAmount}
-              />
+              {/* Список товаров */}
+              {itemsLoading ? (
+                <ActivityIndicator
+                  color="#dc2626"
+                  style={{ marginVertical: 20 }}
+                />
+              ) : clientItems.length === 0 ? (
+                <Text style={styles.noItemsText}>
+                  Нет товаров доступных для возврата
+                </Text>
+              ) : (
+                <ScrollView style={{ maxHeight: 200, marginBottom: 12 }}>
+                  {clientItems.map((product) => {
+                    const isSelected =
+                      selectedReturnProduct?.product === product.product;
+                    return (
+                      <TouchableOpacity
+                        key={product.product}
+                        disabled={returnLoading}
+                        style={[
+                          styles.returnProductItem,
+                          isSelected && styles.returnProductItemSelected,
+                          returnLoading && { opacity: 0.6 },
+                        ]}
+                        onPress={() => {
+                          setSelectedReturnProduct(product);
+                          setReturnQuantity("1");
+                        }}
+                      >
+                        <View style={styles.returnProductRow}>
+                          <Text style={styles.returnProductName}>
+                            {product.product}
+                          </Text>
+                          {/* Бейдж — сколько можно вернуть */}
+                          <View style={styles.remainingBadge}>
+                            <Text style={styles.remainingBadgeText}>
+                              ещё {product.remaining} шт
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.returnProductPrice}>
+                          {Number(product.price).toLocaleString()} сом / шт
+                          {product.alreadyReturned > 0 && (
+                            <Text style={{ color: "#dc2626" }}>
+                              {" "}
+                              · уже возвращено: {product.alreadyReturned} шт
+                            </Text>
+                          )}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Количество и сумма */}
+              {selectedReturnProduct && !itemsLoading && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.returnQtyLabel}>
+                    Количество для возврата (макс.{" "}
+                    {selectedReturnProduct.remaining} шт):
+                  </Text>
+                  <TextInput
+                    editable={!returnLoading}
+                    style={[
+                      styles.moneyInput,
+                      returnLoading && { opacity: 0.6 },
+                    ]}
+                    keyboardType="numeric"
+                    placeholder="Количество"
+                    value={returnQuantity}
+                    onChangeText={(val) => {
+                      // Не даём ввести больше чем remaining
+                      const num = parseInt(val) || 0;
+                      if (num > selectedReturnProduct.remaining) {
+                        setReturnQuantity(
+                          String(selectedReturnProduct.remaining)
+                        );
+                      } else {
+                        setReturnQuantity(val);
+                      }
+                    }}
+                  />
+                  <Text style={styles.returnSumText}>
+                    Сумма возврата:{" "}
+                    {(
+                      (parseInt(returnQuantity) || 0) *
+                      Number(selectedReturnProduct.price)
+                    ).toLocaleString()}{" "}
+                    сом
+                  </Text>
+                </View>
+              )}
+
               {returnLoading ? (
                 <ActivityIndicator color="#dc2626" />
               ) : (
                 <TouchableOpacity
                   onPress={handleReturn}
-                  disabled={returnLoading}
+                  disabled={
+                    itemsLoading || !selectedReturnProduct || returnLoading
+                  }
                   style={{
-                    backgroundColor: "#dc2626",
+                    backgroundColor:
+                      itemsLoading || !selectedReturnProduct
+                        ? "#fca5a5"
+                        : "#dc2626",
                     paddingVertical: 12,
                     paddingHorizontal: 20,
                     borderRadius: 8,
                     alignItems: "center",
-                    justifyContent: "center",
                     marginTop: 10,
                   }}
                 >
                   <Text
-                    style={{
-                      color: "#ffffff",
-                      fontWeight: "bold",
-                      fontSize: 16,
-                    }}
+                    style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}
                   >
                     Оформить возврат
                   </Text>
@@ -395,18 +564,25 @@ console.log(data)
                 style={styles.cancelBtn}
                 disabled={returnLoading}
                 onPress={() => {
-                  if (returnLoading) return;
-
                   setReturnModalVisible(false);
-                  setReturnAmount("");
+                  setSelectedReturnProduct(null);
+                  setReturnQuantity("1");
                 }}
               >
-                <Text>Отмена</Text>
+                <Text style={returnLoading && { color: "#ccc" }}>Отмена</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
       </ScrollView>
+
+      {/* Оверлей перезагрузки */}
+      {reloading && (
+        <View style={styles.reloadOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.reloadText}>Обновление данных...</Text>
+        </View>
+      )}
     </>
   );
 }
@@ -431,10 +607,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     letterSpacing: -0.5,
   },
-  marketSection: {
-    marginTop: 15,
-    marginBottom: 10,
-  },
+  marketSection: { marginTop: 15, marginBottom: 10 },
   marketHeaderTitle: {
     fontSize: 14,
     fontWeight: "700",
@@ -456,9 +629,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  activeDebtCard: {
-    borderColor: "#fee2e2",
-  },
+  activeDebtCard: { borderColor: "#fee2e2" },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -468,11 +639,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f1f3f5",
     paddingBottom: 10,
   },
-  name: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
+  name: { fontSize: 18, fontWeight: "700", color: "#1a1a1a" },
   miniDebtBadge: {
     fontSize: 13,
     fontWeight: "700",
@@ -489,16 +656,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  infoValue: {
-    fontSize: 14,
-    color: "#1a1a1a",
-    fontWeight: "600",
-  },
+  infoLabel: { fontSize: 14, color: "#666", fontWeight: "500" },
+  infoValue: { fontSize: 14, color: "#1a1a1a", fontWeight: "600" },
   debtRow: {
     borderTopWidth: 1,
     borderTopColor: "#f1f3f5",
@@ -506,70 +665,121 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     marginBottom: 0,
   },
-  debtLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-  debtValue: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  textRed: {
-    color: "#ef4444",
-  },
+  debtLabel: { fontSize: 15, fontWeight: "700", color: "#1a1a1a" },
+  debtValue: { fontSize: 16, fontWeight: "800" },
+  textRed: { color: "#ef4444" },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     marginTop: 40,
     padding: 20,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#22c55e",
-  },
-  spacer: {
-    height: 40,
-  },
-  actionRow: {
-    flexDirection: "row",
-    marginTop: 12,
-  },
-
+  emptyText: { fontSize: 16, fontWeight: "600", color: "#22c55e" },
+  spacer: { height: 40 },
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
   },
-
   modalContent: {
     backgroundColor: "#fff",
     width: "85%",
     borderRadius: 16,
     padding: 20,
   },
-
   modalTitle: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 15,
     textAlign: "center",
   },
-
   moneyInput: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 10,
     padding: 12,
-    marginBottom: 15,
+    marginBottom: 10,
     color: "#000",
     fontSize: 16,
+    textAlign: "center",
   },
-
-  cancelBtn: {
-    marginTop: 10,
+  cancelBtn: { marginTop: 10, alignItems: "center" },
+  noItemsText: {
+    color: "#999",
+    textAlign: "center",
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  returnProductItem: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: "#fff",
+  },
+  returnProductItemSelected: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#dc2626",
+  },
+  returnProductRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+  },
+  returnProductName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a1a1a",
+    flex: 1,
+  },
+  remainingBadge: {
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#86efac",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  remainingBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#16a34a",
+  },
+  returnProductPrice: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  returnQtyLabel: {
+    fontSize: 12,
+    color: "#888",
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  returnSumText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#dc2626",
+    textAlign: "center",
+  },
+  reloadOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 99999,
+    elevation: 99999,
+  },
+  reloadText: {
+    color: "#fff",
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

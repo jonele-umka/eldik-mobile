@@ -1,6 +1,7 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,12 +12,28 @@ import {
 import AnalyticsScreen from "../homeScreen/AnalyticsScreen";
 
 export default function HomeScreen() {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const analyticsRef = useRef(null);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    if (analyticsRef.current) {
+      await analyticsRef.current.load();
+    }
+
+    setRefreshing(false);
+  }, []);
   return (
     <SafeAreaView style={styles.container}>
       {/* Оборачиваем в ScrollView на случай маленьких экранов */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Главное действие: Новый заказ */}
         <View style={styles.mainActionContainer}>
@@ -34,10 +51,8 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Разделитель / Заголовок для остальных разделов */}
         <Text style={styles.sectionTitle}>Быстрый доступ</Text>
 
-        {/* Сетка 2х2 для бывших пунктов бургер-меню */}
         <View style={styles.grid}>
           <TouchableOpacity
             style={styles.subTile}
@@ -70,14 +85,14 @@ export default function HomeScreen() {
             <Text style={styles.subTileTitle}>Отчеты</Text>
           </TouchableOpacity>
         </View>
-        <AnalyticsScreen />
+        <AnalyticsScreen ref={analyticsRef} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F7FA" }, // Более мягкий фон
+  container: { flex: 1, backgroundColor: "#F5F7FA" },
   scrollContent: { paddingBottom: 40 },
 
   // Главная кнопка заказа

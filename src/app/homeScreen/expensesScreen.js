@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getExpenses, saveExpense } from "../../services/api";
+import { getClients, getExpenses, saveExpense } from "../../services/api";
 
 export default function ExpensesScreen() {
   const [data, setData] = useState([]);
@@ -22,6 +22,8 @@ export default function ExpensesScreen() {
   const [newExpense, setNewExpense] = useState({ category: "", amount: "" });
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
+  const [selectedMarket, setSelectedMarket] = useState("");
+  const [markets, setMarkets] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -30,8 +32,15 @@ export default function ExpensesScreen() {
   async function loadData() {
     setLoading(true);
     try {
-      const res = await getExpenses();
+      const [res, clients] = await Promise.all([getExpenses(), getClients()]);
       setData(res);
+
+      const uniqueMarkets = [
+        ...new Set(
+          clients.map((c) => c.market).filter((m) => m && m.trim() !== "")
+        ),
+      ];
+      setMarkets(uniqueMarkets);
     } catch (e) {
       console.error(e);
     } finally {
@@ -53,9 +62,11 @@ export default function ExpensesScreen() {
     try {
       await saveExpense({
         ...newExpense,
+        market: selectedMarket,
         date: date.toLocaleDateString("ru-RU"),
       });
       setNewExpense({ category: "", amount: "" });
+      setSelectedMarket("");
       loadData();
     } catch (e) {
       Alert.alert("Ошибка", "Не удалось сохранить");
@@ -70,11 +81,7 @@ export default function ExpensesScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={["#22c55e"]}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       <Text style={styles.title}>Расходы</Text>
@@ -120,6 +127,39 @@ export default function ExpensesScreen() {
           onChangeText={(t) => setNewExpense({ ...newExpense, amount: t })}
         />
 
+        <Text style={styles.label}>Рынок (необязательно)</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 16 }}
+        >
+          {["", ...markets].map((m) => (
+            <TouchableOpacity
+              key={m}
+              onPress={() => setSelectedMarket(m)}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 12,
+                marginRight: 8,
+                backgroundColor: selectedMarket === m ? "#22c55e" : "#f1f5f9",
+                borderWidth: 1,
+                borderColor: selectedMarket === m ? "#22c55e" : "#e2e8f0",
+              }}
+            >
+              <Text
+                style={{
+                  color: selectedMarket === m ? "#fff" : "#334155",
+                  fontWeight: "600",
+                  fontSize: 14,
+                }}
+              >
+                {m || "Общий"}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
         <TouchableOpacity
           style={styles.saveBtn}
           onPress={handleSave}
@@ -142,6 +182,9 @@ export default function ExpensesScreen() {
           <View key={index} style={styles.card}>
             <View>
               <Text style={styles.category}>{item.category}</Text>
+              {item.market ? (
+                <Text style={styles.marketMeta}>🏪 {item.market}</Text>
+              ) : null}
               <Text style={styles.dateMeta}>{item.date || "Недавно"}</Text>
             </View>
             <Text style={styles.amount}>
@@ -222,6 +265,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   category: { fontSize: 16, fontWeight: "700", color: "#1e293b" },
+  marketMeta: {
+    fontSize: 12,
+    color: "#22c55e",
+    marginTop: 2,
+    fontWeight: "600",
+  },
   dateMeta: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
   amount: { fontSize: 16, fontWeight: "800", color: "#e11d48" },
 });

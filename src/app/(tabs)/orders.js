@@ -16,47 +16,42 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [orders, setOrders] = useState([]);
   const [finance, setFinance] = useState({});
+
   const groupOrders = (rawData) => {
     const groups = {};
 
     rawData.forEach((item) => {
       if (!item.client || !item.product) return;
 
-      const client = String(item.client).trim();
-      const orderDate = String(item.orderDate).trim();
-      const deliveryDate = String(item.deliveryDate).trim();
-      const market = String(item.market).trim();
-      const key = `${client}_${orderDate}`;
+      const key = item.orderId;
+      if (!key) return;
 
       if (!groups[key]) {
         groups[key] = {
-          client: client,
-          market: market,
-          deliveryDate: deliveryDate,
-          orderDate: orderDate,
+          orderId: item.orderId,
+          client: String(item.client).trim(),
+          market: String(item.market).trim(),
+          deliveryDate: String(item.deliveryDate).trim(),
+          orderDate: String(item.orderDate).trim(),
           status: item.status || "Новый",
           items: [],
           totalSum: 0,
-          paidAmount: 0,
-          returnedAmount: 0,
+          paidAmount: Number(item.paidAmount || 0),
+          returnedAmount: Number(item.returnedAmount || 0),
         };
       }
 
       groups[key].items.push({
         id: item.id || "",
         product: String(item.product).trim(),
-        quantity: item.quantity,
-        price: item.price,
-        total: item.total,
+        quantity: String(item.quantity),
+        price: String(item.price),
+        total: String(item.total),
         comment: item.comment || "",
+        giftQty: Number(item.giftQty || 0),
+        paidQty: Number(item.paidQuantity || item.quantity),
+        finalQty: Number(item.finalQuantity || item.quantity),
       });
-
-      const itemPaid = Number(item.paidAmount || 0);
-      const itemReturned = Number(item.returnedAmount || 0);
-
-      if (itemPaid > groups[key].paidAmount) groups[key].paidAmount = itemPaid;
-      if (itemReturned > groups[key].returnedAmount)
-        groups[key].returnedAmount = itemReturned;
 
       const cleanTotal = String(item.total)
         .replace(/[\s\u00a0]/g, "")
@@ -141,48 +136,40 @@ export default function OrdersScreen() {
 
   let lastOrderDay = "";
   let lastMarket = "";
-  const totalOrdersSum = orders.reduce((sum, order) => sum + order.totalSum, 0);
 
-  const totalPaidSum = orders.reduce((sum, order) => sum + order.paidAmount, 0);
-  const totalReturnedSum = orders.reduce(
-    (sum, order) => sum + order.returnedAmount,
-    0
-  );
-
+  const totalOrdersSum = orders.reduce((sum, o) => sum + o.totalSum, 0);
+  const totalPaidSum = orders.reduce((sum, o) => sum + o.paidAmount, 0);
+  const totalReturnedSum = orders.reduce((sum, o) => sum + o.returnedAmount, 0);
   const totalDebtSum = orders.reduce(
-    (sum, order) =>
-      sum +
-      Math.max(0, order.totalSum - order.returnedAmount - order.paidAmount),
+    (sum, o) => sum + Math.max(0, o.totalSum - o.returnedAmount - o.paidAmount),
     0
   );
   const netVolume = totalOrdersSum - totalReturnedSum;
 
-  const months = Object.keys(finance || {});
-  const currentMonth = months[months.length - 1];
-
-  let balance = 0;
-
-  if (currentMonth && finance[currentMonth]) {
-    Object.values(finance[currentMonth]).forEach((d) => {
-      balance +=
-        Number(d.income || 0) - Number(d.expense || 0) - Number(d.returns || 0);
+  // Расходы — из finance (отдельные траты, не связаны с заказами)
+  let totalExpenseSum = 0;
+  Object.values(finance || {}).forEach((monthData) => {
+    Object.values(monthData).forEach((d) => {
+      totalExpenseSum += Number(d.expense || 0);
     });
-  }
+  });
+
+  // Баланс = реально полученные деньги − расходы
+  // Возвраты товара без оплаты НЕ влияют на баланс
+  // Если клиент вернул товар который оплатил — это уже отражено в paidAmount
+  const balance = totalPaidSum - totalExpenseSum;
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={["#1a1a1a"]}
-          tintColor="#1a1a1a"
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       <Text style={styles.screenTitle}>Список заказов</Text>
+
       <View style={styles.summaryContainer}>
         <View style={styles.grid}>
           <View
@@ -196,7 +183,6 @@ export default function OrdersScreen() {
               {totalOrdersSum.toLocaleString()} сом
             </Text>
           </View>
-
           <View
             style={[
               styles.summaryCard,
@@ -209,6 +195,7 @@ export default function OrdersScreen() {
             </Text>
           </View>
         </View>
+
         <View style={styles.grid}>
           <View
             style={[
@@ -233,46 +220,44 @@ export default function OrdersScreen() {
             </Text>
           </View>
         </View>
+
         <View style={styles.grid}>
           <View
             style={[
               styles.summaryCard,
-              {
-                backgroundColor: "#f3e8ff",
-                borderColor: "#c4b5fd",
-              },
+              { backgroundColor: "#f3e8ff", borderColor: "#c4b5fd" },
             ]}
           >
             <Text style={styles.summaryLabel}>Чистый объем</Text>
-
-            <Text
-              style={[
-                styles.summaryValue,
-                {
-                  color: "#7c3aed",
-                },
-              ]}
-            >
+            <Text style={[styles.summaryValue, { color: "#7c3aed" }]}>
               {netVolume.toLocaleString()} сом
             </Text>
           </View>
           <View
             style={[
               styles.summaryCard,
-              {
-                backgroundColor: "#f0fdf4",
-                borderColor: "#86efac",
-              },
+              { backgroundColor: "#fff1f2", borderColor: "#fca5a5" },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>Расходы</Text>
+            <Text style={[styles.summaryValue, { color: "#dc2626" }]}>
+              {totalExpenseSum.toLocaleString()} сом
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.grid}>
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: "#f0fdf4", borderColor: "#86efac" },
             ]}
           >
             <Text style={styles.summaryLabel}>Баланс</Text>
-
             <Text
               style={[
                 styles.summaryValue,
-                {
-                  color: balance >= 0 ? "#16a34a" : "#dc2626",
-                },
+                { color: balance >= 0 ? "#16a34a" : "#dc2626" },
               ]}
             >
               {balance.toLocaleString()} сом
@@ -284,7 +269,7 @@ export default function OrdersScreen() {
       {orders.length === 0 ? (
         <Text style={styles.emptyText}>Заказы не найдены.</Text>
       ) : (
-        orders.map((order, index) => {
+        orders.map((order) => {
           const currentOrderDay = order.orderDate
             ? order.orderDate.split(" ")[0]
             : "";
@@ -300,7 +285,7 @@ export default function OrdersScreen() {
           const remainingDebt = finalSum - order.paidAmount;
 
           return (
-            <View key={index}>
+            <View key={order.orderId}>
               {showDateHeader && (
                 <View style={styles.dateHeaderContainer}>
                   <Text style={styles.dateHeaderText}>
@@ -372,7 +357,7 @@ export default function OrdersScreen() {
 
                 <Text style={styles.deliveryDateSubText}>
                   🚚 Доставка: {order.deliveryDate} • Позиций:{" "}
-                  {order.items.length}
+                  {order.items.reduce((s, i) => s + Number(i.quantity || 0), 0)}
                 </Text>
 
                 <View style={styles.financeGrid}>
@@ -455,17 +440,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
-
     borderWidth: 1,
     borderColor: "#e9ecef",
-
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
-
     elevation: 5,
   },
   cardHeaderRow: {
@@ -505,15 +484,8 @@ const styles = StyleSheet.create({
   finValue: { fontSize: 13, fontWeight: "700", color: "#1a1a1a" },
   statusBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
   statusText: { fontSize: 11, fontWeight: "700" },
-  summaryContainer: {
-    marginBottom: 20,
-  },
-  grid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-
+  summaryContainer: { marginBottom: 20 },
+  grid: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   summaryCard: {
     flex: 1,
     minHeight: 50,
@@ -522,7 +494,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
   },
-
   summaryLabel: {
     fontSize: 12,
     fontWeight: "600",
@@ -530,9 +501,5 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: "uppercase",
   },
-
-  summaryValue: {
-    fontSize: 22,
-    fontWeight: "800",
-  },
+  summaryValue: { fontSize: 22, fontWeight: "800" },
 });

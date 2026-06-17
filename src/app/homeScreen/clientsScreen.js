@@ -7,7 +7,6 @@ import {
   SectionList,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -152,59 +151,58 @@ export default function ClientsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={isSubmitting ? null : onRefresh}
-            colors={["#1a1a1a"]}
           />
         }
-        ListHeaderComponent={
-          <View>
-            <Text style={styles.screenTitle}>Управление клиентами</Text>
-            <View style={[styles.addCard, isSubmitting && { opacity: 0.6 }]}>
-              <TextInput
-                style={styles.input}
-                placeholder="Рынок *"
-                value={market}
-                onChangeText={setMarket}
-                editable={!isSubmitting}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Имя клиента *"
-                value={name}
-                onChangeText={setName}
-                editable={!isSubmitting}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Телефон"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                editable={!isSubmitting}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Адрес доставки"
-                value={address}
-                onChangeText={setAddress}
-                editable={!isSubmitting}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.addBtn,
-                  isSubmitting && { backgroundColor: "#86efac" },
-                ]}
-                onPress={handleCreateClient}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.addBtnText}>Создать нового клиента</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        }
+        // ListHeaderComponent={
+        //   <View>
+        //     <Text style={styles.screenTitle}>Управление клиентами</Text>
+        //     <View style={[styles.addCard, isSubmitting && { opacity: 0.6 }]}>
+        //       <TextInput
+        //         style={styles.input}
+        //         placeholder="Рынок *"
+        //         value={market}
+        //         onChangeText={setMarket}
+        //         editable={!isSubmitting}
+        //       />
+        //       <TextInput
+        //         style={styles.input}
+        //         placeholder="Имя клиента *"
+        //         value={name}
+        //         onChangeText={setName}
+        //         editable={!isSubmitting}
+        //       />
+        //       <TextInput
+        //         style={styles.input}
+        //         placeholder="Телефон"
+        //         value={phone}
+        //         onChangeText={setPhone}
+        //         keyboardType="phone-pad"
+        //         editable={!isSubmitting}
+        //       />
+        //       <TextInput
+        //         style={styles.input}
+        //         placeholder="Адрес доставки"
+        //         value={address}
+        //         onChangeText={setAddress}
+        //         editable={!isSubmitting}
+        //       />
+        //       <TouchableOpacity
+        //         style={[
+        //           styles.addBtn,
+        //           isSubmitting && { backgroundColor: "#86efac" },
+        //         ]}
+        //         onPress={handleCreateClient}
+        //         disabled={isSubmitting}
+        //       >
+        //         {isSubmitting ? (
+        //           <ActivityIndicator color="#fff" />
+        //         ) : (
+        //           <Text style={styles.addBtnText}>Создать нового клиента</Text>
+        //         )}
+        //       </TouchableOpacity>
+        //     </View>
+        //   </View>
+        // }
         renderSectionHeader={({ section: { title } }) => (
           <View style={styles.marketHeader}>
             <Text style={styles.marketHeaderTitle}>🏪 Рынок: {title}</Text>
@@ -216,7 +214,6 @@ export default function ClientsScreen() {
             disabled={isSubmitting}
             onPress={() =>
               router.push({
-                // ВНИМАНИЕ: Убедись, что этот путь совпадает с твоей структурой папок в app/
                 pathname: "/details/clientDetail",
                 params: { clientParam: JSON.stringify(item) },
               })

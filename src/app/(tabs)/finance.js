@@ -65,7 +65,7 @@ export default function FinanceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color="#22c55e" />
       </View>
     );
   }
@@ -77,11 +77,7 @@ export default function FinanceScreen() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#6366f1"]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
         <Text style={styles.screenTitle}>Финансы</Text>

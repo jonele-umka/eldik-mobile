@@ -1,4 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -14,7 +19,7 @@ import {
   getOrders,
 } from "../../services/api";
 
-export default function AnalyticsScreen() {
+const AnalyticsScreen = forwardRef((props, ref) => {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState([]);
   const [finance, setFinance] = useState({});
@@ -24,23 +29,16 @@ export default function AnalyticsScreen() {
 
   const [selectedMonth, setSelectedMonth] = useState(null);
 
-  useEffect(() => {
-    load();
-  }, []);
-
   const load = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-
       const [fin, orders, analyticsData] = await Promise.all([
         fetchFinanceReport(),
         getOrders(),
         getAnalytics(),
       ]);
       setAnalytics(analyticsData || []);
-      // 👇 продукты / клиенты / рынки считаем прямо на фронте
       const { products, clients, markets } = buildAnalytics(orders);
-
       setFinance(fin || {});
       setProducts(products);
       setClients(clients);
@@ -49,6 +47,13 @@ export default function AnalyticsScreen() {
       setLoading(false);
     }
   };
+  useImperativeHandle(ref, () => ({
+    load,
+  }));
+
+  useEffect(() => {
+    load();
+  }, []);
   const parseDate = (dateStr) => {
     if (!dateStr) return null;
 
@@ -181,7 +186,7 @@ export default function AnalyticsScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      // contentContainerStyle={{ paddingBottom: 40 }}
     >
       <Text style={styles.headerTitle}>
         Аналитика за{" "}
@@ -289,7 +294,7 @@ export default function AnalyticsScreen() {
       </View>
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8f9fa", padding: 16 },
@@ -362,3 +367,4 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
 });
+export default AnalyticsScreen;

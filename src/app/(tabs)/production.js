@@ -120,7 +120,16 @@ export default function ProductionScreen() {
                 <View style={styles.marketList}>
                   {Object.entries(info.markets || {}).map(([market, qty]) => (
                     <View key={market} style={styles.marketRow}>
-                      <Text style={styles.marketName}>📍 {market}</Text>
+                      <View>
+                        <Text style={styles.marketName}>📍 {market}</Text>
+
+                        {!!info.marketComments?.[market] && (
+                          <Text style={styles.commentText}>
+                            💬 {info.marketComments[market]}
+                          </Text>
+                        )}
+                      </View>
+
                       <Text style={styles.marketQty}>{qty} шт</Text>
                     </View>
                   ))}
@@ -198,4 +207,9 @@ const styles = StyleSheet.create({
   },
   marketName: { color: "#475569", fontSize: 14 },
   marketQty: { fontWeight: "700", color: "#1a1a1a" },
+  commentText: {
+    fontSize: 13,
+    color: "#94a3b8",
+    marginTop: 5,
+  },
 });
