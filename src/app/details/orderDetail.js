@@ -2,7 +2,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import HomeButton from "../../components/HomeButton/HomeButton";
+import { usePromo } from "../../context/PromoContext";
 import {
   addOrderRow,
   deleteOrder,
@@ -27,6 +29,7 @@ import {
   updateOrderStatus,
 } from "../../services/api";
 export default function OrderDetailScreen() {
+  const { promoEnabled } = usePromo();
   async function handlePrintInvoice() {
     try {
       setSaving(true);
@@ -34,181 +37,121 @@ export default function OrderDetailScreen() {
       const itemRows = items
         .map((item, index) => {
           const qty = parseInt(item.quantity) || 0;
-          const price = getItemPrice(item.price);
+          const price = getItemPrice(item.price, item.basePrice);
           const promo = calculatePromo(qty);
           const total = promo.paidQty * price;
 
           return `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${item.product}</td>
-            <td style="text-align:center">${qty}</td>
-            <td style="text-align:center; color:#16a34a">
-              ${
-                promo.giftQty > 0
-                  ? `+${promo.giftQty} 🎁<br/><small>итого: ${promo.finalQty}</small>`
-                  : "—"
-              }
-            </td>
-            <td style="text-align:right">${price} сом</td>
-            <td style="text-align:right; font-weight:bold">${total.toLocaleString()} сом</td>
-            <td style="font-size:11px;color:#666">${item.comment || "—"}</td>
-          </tr>
-        `;
+  <tr>
+    <td style="text-align:center; padding:6px 4px">${index + 1}</td>
+    <td style="padding:6px 4px">${item.product}</td>
+    <td style="text-align:center; padding:6px 4px">${qty}</td>
+    <td style="text-align:center; color:#059669; padding:6px 4px">
+      ${promo.giftQty > 0 ? `+${promo.giftQty} <small style="display:block;font-size:9px;color:#666">итог: ${promo.finalQty}</small>` : "—"}
+    </td>
+    <td style="text-align:right; padding:6px 4px">${price.toLocaleString()}</td>
+    <td style="text-align:right; font-weight:600; padding:6px 4px">${total.toLocaleString()}</td>
+  </tr>
+`;
         })
         .join("");
 
       const totalSum = items.reduce((sum, item) => {
         const qty = parseInt(item.quantity) || 0;
         const promo = calculatePromo(qty);
-        return sum + promo.paidQty * getItemPrice(item.price);
+        return sum + promo.paidQty * getItemPrice(item.price, item.basePrice);
       }, 0);
 
       const totalBoxes = items.reduce(
         (s, i) => s + (parseInt(i.quantity) || 0),
-        0
+        0,
       );
-      const totalGifts = items.reduce((s, i) => {
-        return s + calculatePromo(parseInt(i.quantity) || 0).giftQty;
-      }, 0);
+      const totalGifts = items.reduce(
+        (s, i) => s + calculatePromo(parseInt(i.quantity) || 0).giftQty,
+        0,
+      );
 
       const today = new Date();
-      const dateStr = `${String(today.getDate()).padStart(2, "0")}.${String(
-        today.getMonth() + 1
-      ).padStart(2, "0")}.${today.getFullYear()}`;
-      const debt = Math.max(0, totalSum - returnedAmount - paidAmount);
+      const dateStr = `${String(today.getDate()).padStart(2, "0")}.${String(today.getMonth() + 1).padStart(2, "0")}.${today.getFullYear()}`;
+      const orderNum = String(currentOrder.orderId || "").slice(-8);
+      const orderDate = currentOrder.orderDate?.split(" ")[0] || dateStr;
 
-      const html = `
-        <html>
-        <head>
-          <meta charset="utf-8"/>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #1a1a1a; font-size: 13px; }
-            h2 { text-align: center; font-size: 20px; margin-bottom: 4px; letter-spacing: 2px; }
-            .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 12px; }
-            .info-grid { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 16px; }
-            .info-block { flex: 1; }
-            .info-row { margin-bottom: 8px; }
-            .info-label { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-            .info-value { font-weight: bold; font-size: 14px; margin-top: 2px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th { background: #1a1a1a; color: #fff; padding: 9px 7px; font-size: 11px; text-align: left; }
-            td { padding: 8px 7px; border-bottom: 1px solid #e9ecef; font-size: 12px; vertical-align: middle; }
-            tr:nth-child(even) td { background: #f8f9fa; }
-            .total-row td { font-weight: bold; border-top: 2px solid #1a1a1a; background: #f0fdf4 !important; font-size: 13px; }
-            .summary { margin-top: 10px; padding: 16px; border: 2px solid #1a1a1a; border-radius: 8px; }
-            .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-            .summary-divider { border-top: 1px solid #e9ecef; margin: 8px 0; }
-            .summary-total-label { font-size: 15px; font-weight: bold; }
-            .summary-total-value { font-size: 18px; font-weight: bold; color: #dc2626; }
-            .paid-value { color: #16a34a; font-weight: bold; }
-            .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
-            .sig-block { width: 44%; }
-            .sig-line { border-top: 1px solid #1a1a1a; padding-top: 6px; font-size: 11px; color: #666; }
-            .footer { text-align: center; color: #bbb; font-size: 10px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 12px; }
-          </style>
-        </head>
-        <body>
-          <h2>НАКЛАДНАЯ</h2>
-          <div class="subtitle">
-            № ${String(currentOrder.orderId || "").slice(
-              -8
-            )} &nbsp;|&nbsp; Дата записи: ${
-        currentOrder.orderDate?.split(" ")[0] || dateStr
-      }
-          </div>
-  
-          <div class="info-grid">
-            <div class="info-block">
-              <div class="info-row">
-                <div class="info-label">Клиент</div>
-                <div class="info-value">${client}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">Рынок</div>
-                <div class="info-value">${market}</div>
-              </div>
-            </div>
-            <div class="info-block">
-              <div class="info-row">
-                <div class="info-label">Дата доставки</div>
-                <div class="info-value">${deliveryDate}</div>
-              </div>
-              <div class="info-row">
-                <div class="info-label">Статус</div>
-                <div class="info-value">${status}</div>
-              </div>
-            </div>
-          </div>
-  
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Товар</th>
-                <th style="text-align:center">Кол-во</th>
-                <th style="text-align:center">Подарок</th>
-                <th style="text-align:right">Цена</th>
-                <th style="text-align:right">Сумма</th>
-                <th>Комментарий</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemRows}
-              <tr class="total-row">
-                <td colspan="2">ИТОГО</td>
-                <td style="text-align:center">${totalBoxes} шт</td>
-                <td style="text-align:center; color:#16a34a">${
-                  totalGifts > 0 ? `+${totalGifts} шт` : "—"
-                }</td>
-                <td></td>
-                <td style="text-align:right">${totalSum.toLocaleString()} сом</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
-  
-          <div class="summary">
-            <div class="summary-row">
-              <span>Сумма заказа:</span>
-              <span>${totalSum.toLocaleString()} сом</span>
-            </div>
-            ${
-              returnedAmount > 0
-                ? `
-            <div class="summary-row">
-              <span>Возврат товара:</span>
-              <span style="color:#ea580c">−${returnedAmount.toLocaleString()} сом</span>
-            </div>`
-                : ""
-            }
-            <div class="summary-row">
-              <span>Оплачено:</span>
-              <span class="paid-value">+${paidAmount.toLocaleString()} сом</span>
-            </div>
-            <div class="summary-divider"></div>
-            <div class="summary-row">
-              <span class="summary-total-label">Остаток к оплате:</span>
-              <span class="summary-total-value">${debt.toLocaleString()} сом</span>
-            </div>
-          </div>
-  
-          <div class="signatures">
-            <div class="sig-block">
-              <div class="sig-line">Выдал: _______________________</div>
-            </div>
-            <div class="sig-block">
-              <div class="sig-line">Получил (подпись): _______________________</div>
-            </div>
-          </div>
-  
-          <div class="footer">Распечатано: ${dateStr}</div>
-        </body>
-        </html>
-      `;
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; padding: 0; background: #fff; }
+</style></head>
+<body>
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; color:#334155; padding:20px;">
+  <table width="100%" style="margin-bottom:25px;">
+    <tr>
+      <td>
+        <div style="font-size:24px; font-weight:bold; color:#0f172a">НАКЛАДНАЯ</div>
+        <div style="font-size:11px; color:#64748b; margin-top:4px">№ ${orderNum} от ${orderDate}</div>
+      </td>
+    </tr>
+  </table>
 
-      const { uri } = await Print.printToFileAsync({ html });
+  <table width="100%" style="margin-bottom:20px; font-size:13px;">
+    <tr>
+      <td style="width:50%; vertical-align:top;">
+        <div style="color:#94a3b8; font-size:10px; text-transform:uppercase">Клиент</div>
+        <div style="font-weight:600; margin-bottom:8px">${client}</div>
+        <div style="color:#94a3b8; font-size:10px; text-transform:uppercase">Рынок</div>
+        <div style="font-weight:600">${market}</div>
+      </td>
+      <td style="width:50%; vertical-align:top;">
+        <div style="color:#94a3b8; font-size:10px; text-transform:uppercase">Дата доставки</div>
+        <div style="font-weight:600; margin-bottom:8px">${deliveryDate}</div>
+        <div style="color:#94a3b8; font-size:10px; text-transform:uppercase">Статус</div>
+        <div style="font-weight:600">${status}</div>
+      </td>
+    </tr>
+  </table>
 
+  <table width="100%" style="border-collapse:collapse; margin-bottom:20px; font-size:12px;">
+  <thead>
+    <tr style="border-bottom:2px solid #e2e8f0; color:#64748b; text-transform:uppercase; font-size:10px;">
+      <th style="padding:8px 4px; text-align:center; width:5%">#</th>
+      <th style="padding:8px 4px; text-align:left; width:40%">Товар</th>
+      <th style="padding:8px 4px; text-align:center; width:10%">Кол-во</th>
+      <th style="padding:8px 4px; text-align:center; width:15%">Подарок</th>
+      <th style="padding:8px 4px; text-align:right; width:15%">Цена</th>
+      <th style="padding:8px 4px; text-align:right; width:15%">Сумма</th>
+    </tr>
+  </thead>
+    <tbody>
+      ${itemRows}
+      <tr style="background:#f8fafc; font-weight:bold; border-top:2px solid #e2e8f0;">
+        <td colspan="2" style="padding:10px 8px;">ИТОГО</td>
+        <td style="text-align:center">${totalBoxes}</td>
+        <td style="text-align:center; color:#059669">${totalGifts > 0 ? `+${totalGifts}` : "—"}</td>
+        <td></td>
+        <td style="text-align:right">${totalSum.toLocaleString()}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:20px; text-align:right;">
+    <span style="font-weight:bold; font-size:15px; margin-right: 15px;">К ОПЛАТЕ:</span>
+    <span style="font-weight:900; font-size:22px; color:#e11d48">${totalSum.toLocaleString()}</span>
+  </div>
+
+  <div style="font-size:11px; margin-bottom:20px; color:#64748b">
+    WhatsApp: <b>0509 070 708</b> | Мбанк: <b>0509 070 708</b>
+  </div>
+
+  <table width="100%" style="margin-top:40px;">
+    <tr>
+      <td style="width:45%; border-top:1px solid #cbd5e1; font-size:10px; color:#94a3b8; padding-top:5px;">Выдал</td>
+      <td style="width:10%"></td>
+      <td style="width:45%; border-top:1px solid #cbd5e1; font-size:10px; color:#94a3b8; padding-top:5px;">Получил</td>
+    </tr>
+  </table>
+</div>
+</body></html>`;
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
       await Sharing.shareAsync(uri, {
         UTI: ".pdf",
         mimeType: "application/pdf",
@@ -261,7 +204,7 @@ export default function OrderDetailScreen() {
   const [market, setMarket] = useState(currentOrder?.market || "");
   const [client, setClient] = useState(currentOrder?.client || "");
   const [deliveryDate, setDeliveryDate] = useState(
-    currentOrder?.deliveryDate || ""
+    currentOrder?.deliveryDate || "",
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   if (!currentOrder) {
@@ -315,11 +258,11 @@ export default function OrderDetailScreen() {
   const [items, setItems] = useState(currentOrder?.items || []);
 
   const [paidAmount, setPaidAmount] = useState(
-    Number(currentOrder?.paidAmount || 0)
+    Number(currentOrder?.paidAmount || 0),
   );
 
   const [returnedAmount, setReturnedAmount] = useState(
-    Number(currentOrder?.returnedAmount || 0)
+    Number(currentOrder?.returnedAmount || 0),
   );
 
   const toggleStatus = async () => {
@@ -351,6 +294,7 @@ export default function OrderDetailScreen() {
         const res = await getPrices();
         if (res && Array.isArray(res)) {
           setPriceList(res);
+
           setItems((prevItems) =>
             prevItems.map((item) => {
               const match = res.find((p) => p.product === item.product);
@@ -358,8 +302,9 @@ export default function OrderDetailScreen() {
                 ...item,
                 image: match ? match.image : item.image || "",
                 weight: match ? match.weight : item.weight || "0",
+                basePrice: match ? match.price : null, // ← добавь это
               };
-            })
+            }),
           );
         }
       } catch (e) {
@@ -387,7 +332,10 @@ export default function OrderDetailScreen() {
 
     const promo = calculatePromo(qtyNum);
 
-    const priceNum = getItemPrice(updatedItems[index].price);
+    const priceNum = getItemPrice(
+      updatedItems[index].price,
+      updatedItems[index].basePrice,
+    );
 
     updatedItems[index].giftQty = promo.giftQty;
     updatedItems[index].paidQty = promo.paidQty;
@@ -428,6 +376,7 @@ export default function OrderDetailScreen() {
       id: "NEW_" + Date.now(),
       product: selectedProduct.product,
       price: selectedProduct.price.toString(),
+      basePrice: selectedProduct.price,
       weight: selectedProduct.weight,
       image: selectedProduct.image,
 
@@ -436,8 +385,10 @@ export default function OrderDetailScreen() {
       giftQty: promo.giftQty,
       paidQty: promo.paidQty,
       finalQty: promo.finalQty,
-
-      total: (promo.paidQty * getItemPrice(selectedProduct.price)).toString(),
+      total: (
+        promo.paidQty *
+        getItemPrice(selectedProduct.price, selectedProduct.price)
+      ).toString(),
 
       comment: "",
     };
@@ -463,14 +414,18 @@ export default function OrderDetailScreen() {
     setItems((prev) =>
       prev.map((item) => {
         const qty = parseInt(item.quantity) || 0;
-
         const promo = calculatePromo(qty);
-
-        const price =
-          selectedMarket === "Аламедин"
-            ? Number(item.price) + 20
-            : Number(item.price);
-
+        // getItemPrice использует state market, но он ещё не обновился,
+        // поэтому считаем вручную через basePrice:
+        const base =
+          item.basePrice != null
+            ? Number(item.basePrice)
+            : parseFloat(
+                String(item.price)
+                  .replace(/[\s\u00a0]/g, "")
+                  .replace(",", "."),
+              ) || 0;
+        const price = selectedMarket === "Аламедин" ? base + 20 : base;
         return {
           ...item,
           giftQty: promo.giftQty,
@@ -478,12 +433,10 @@ export default function OrderDetailScreen() {
           finalQty: promo.finalQty,
           total: (promo.paidQty * price).toString(),
         };
-      })
+      }),
     );
     const firstClient = clients.find((c) => c.market === selectedMarket);
-
     setClient(firstClient?.name || "");
-
     setMarketModalVisible(false);
   };
 
@@ -540,7 +493,10 @@ export default function OrderDetailScreen() {
       return;
     }
 
-    const cleanPrice = getItemPrice(selectedReturnProduct.price);
+    const cleanPrice = getItemPrice(
+      selectedReturnProduct.price,
+      selectedReturnProduct.basePrice,
+    );
     const returnSum = cleanPrice * qty;
 
     try {
@@ -588,7 +544,7 @@ export default function OrderDetailScreen() {
             giftQty: promo.giftQty,
             paidQuantity: promo.paidQty,
             finalQuantity: promo.finalQty,
-            total: promo.paidQty * getItemPrice(item.price),
+            total: promo.paidQty * getItemPrice(item.price, item.basePrice),
             comment: item.comment || "",
           };
 
@@ -618,7 +574,7 @@ export default function OrderDetailScreen() {
               items: [preparedItem],
             });
           }
-        })
+        }),
       );
 
       const allSuccess = results.every((r) => r?.success);
@@ -673,23 +629,24 @@ export default function OrderDetailScreen() {
     ]);
   };
   function calculatePromo(qty) {
-    const giftQty = Math.floor(qty / 10);
-
+    const giftQty = promoEnabled ? Math.floor(qty / 10) : 0;
     return {
       giftQty,
       finalQty: qty + giftQty,
       paidQty: qty,
     };
   }
-  function getItemPrice(price) {
-    const basePrice =
-      parseFloat(
-        String(price)
-          .replace(/[\s\u00a0]/g, "")
-          .replace(",", ".")
-      ) || 0;
+  function getItemPrice(price, basePrice) {
+    const base =
+      basePrice != null
+        ? Number(basePrice)
+        : parseFloat(
+            String(price)
+              .replace(/[\s\u00a0]/g, "")
+              .replace(",", "."),
+          ) || 0;
 
-    return market === "Аламедин" ? basePrice + 20 : basePrice;
+    return market === "Аламедин" ? base + 20 : base;
   }
 
   return (
@@ -699,6 +656,7 @@ export default function OrderDetailScreen() {
         style={[styles.container, saving && styles.disabledElement]}
         showsVerticalScrollIndicator={false}
       >
+        <HomeButton />
         <TouchableOpacity
           style={[
             styles.statusButton,
@@ -793,7 +751,7 @@ export default function OrderDetailScreen() {
                   .filter(
                     (r) =>
                       r.client?.trim().toLowerCase() ===
-                      currentOrder.client?.trim().toLowerCase()
+                      currentOrder.client?.trim().toLowerCase(),
                   )
                   .forEach((r) => {
                     const p = r.product?.trim();
@@ -915,6 +873,7 @@ export default function OrderDetailScreen() {
                 <TextInput
                   style={[styles.smallInput, saving && styles.disabledInput]}
                   value={goods.quantity.toString()}
+                  placeholderTextColor="#666"
                   keyboardType="numeric"
                   editable={!saving}
                   onChangeText={(val) => handleQuantityChange(index, val)}
@@ -946,7 +905,7 @@ export default function OrderDetailScreen() {
                 style={{ alignItems: "flex-end", justifyContent: "center" }}
               >
                 <Text style={styles.priceText}>
-                  {getItemPrice(goods.price)} сом / шт
+                  {getItemPrice(goods.price, goods.basePrice)} сом / шт
                 </Text>
                 <Text style={styles.totalItemText}>
                   Итого: {parseFloat(goods.total || 0).toLocaleString()} сом
@@ -960,6 +919,7 @@ export default function OrderDetailScreen() {
             <TextInput
               style={[styles.itemCommentInput, saving && styles.disabledInput]}
               value={goods.comment}
+              placeholderTextColor="#666"
               editable={!saving}
               placeholder="Особые пожелания..."
               onChangeText={(val) => handleCommentChange(index, val)}
@@ -1015,6 +975,7 @@ export default function OrderDetailScreen() {
               style={[styles.moneyInput, saving && styles.disabledInput]}
               placeholder="Введите сумму в сомах"
               keyboardType="numeric"
+              placeholderTextColor="#666"
               editable={!saving}
               value={inputPayment}
               onChangeText={setInputPayment}
@@ -1141,7 +1102,7 @@ export default function OrderDetailScreen() {
                       {alreadyReturned > 0
                         ? ` · возвращено: ${alreadyReturned} шт`
                         : ""}{" "}
-                      | {item.price} сом
+                      | {getItemPrice(item.price, item.basePrice)} сом
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1162,6 +1123,7 @@ export default function OrderDetailScreen() {
                   style={[styles.moneyInput, saving && styles.disabledInput]}
                   placeholder="Количество (шт)"
                   keyboardType="numeric"
+                  placeholderTextColor="#666"
                   editable={!saving}
                   value={returnQuantity}
                   onChangeText={(val) => {
@@ -1221,7 +1183,7 @@ export default function OrderDetailScreen() {
                   >
                     <Text style={styles.selectItemText}>{item}</Text>
                   </TouchableOpacity>
-                )
+                ),
               )}
             </ScrollView>
 

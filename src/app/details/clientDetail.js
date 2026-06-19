@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import HomeButton from "../../components/HomeButton/HomeButton";
 import {
   deleteClientFromServer,
   updateClientOnServer,
@@ -39,13 +40,16 @@ export default function ClientDetailScreen() {
       return;
     }
     if (!client.id) {
-      Alert.alert("Ошибка", "У этого клиента отсутствует внутренний ID. Обновите базу данных свайпом вниз.");
+      Alert.alert(
+        "Ошибка",
+        "У этого клиента отсутствует внутренний ID. Обновите базу данных свайпом вниз.",
+      );
       return;
     }
     try {
       setLoading(true);
       const res = await updateClientOnServer({
-        id: client.id, 
+        id: client.id,
         market: market.trim(),
         name: name.trim(),
         phone: phone.trim(),
@@ -84,7 +88,7 @@ export default function ClientDetailScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              await deleteClientFromServer(client.id); 
+              await deleteClientFromServer(client.id);
               router.replace("/homeScreen/clientsScreen");
             } catch (e) {
               Alert.alert("Ошибка", "Не удалось удалить клиента");
@@ -93,28 +97,34 @@ export default function ClientDetailScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
+      <HomeButton />
       <Text style={styles.title}>Карточка клиента</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Рынок</Text>
         <TextInput
           style={styles.input}
+          placeholderTextColor="#666"
           value={market}
           onChangeText={setMarket}
           placeholder="Укажите рынок"
         />
 
         <Text style={styles.label}>ФИО Клиента</Text>
-        <TextInput 
-          style={styles.input} 
-          value={name} 
-          onChangeText={setName} 
+        <TextInput
+          style={styles.input}
+          placeholderTextColor="#666"
+          value={name}
+          onChangeText={setName}
           placeholder="Введите имя"
         />
 
@@ -122,6 +132,7 @@ export default function ClientDetailScreen() {
         <TextInput
           style={styles.input}
           value={phone}
+          placeholderTextColor="#666"
           onChangeText={setPhone}
           keyboardType="phone-pad"
           placeholder="Телефон не указан"
@@ -131,6 +142,7 @@ export default function ClientDetailScreen() {
         <TextInput
           style={styles.input}
           value={address}
+          placeholderTextColor="#666"
           onChangeText={setAddress}
           placeholder="Адрес не указан"
         />
@@ -167,7 +179,12 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 22, fontWeight: "800", marginBottom: 16, color: "#1a1a1a" },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 16,
+    color: "#1a1a1a",
+  },
   card: {
     backgroundColor: "#fff",
     padding: 16,
@@ -202,12 +219,12 @@ const styles = StyleSheet.create({
     height: 54,
     justifyContent: "center",
   },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  saveBtnText: { color: "#fff", fontWeight: "500", fontSize: 16 },
   deleteBtn: {
     backgroundColor: "#fee2e2",
     padding: 14,
     borderRadius: 12,
     alignItems: "center",
   },
-  deleteBtnText: { color: "#ef4444", fontWeight: "700" },
+  deleteBtnText: { color: "#ef4444", fontWeight: "500" },
 });

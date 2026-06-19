@@ -114,6 +114,7 @@ export default function ExpensesScreen() {
         <TextInput
           placeholder="Например: Аренда"
           style={styles.input}
+          placeholderTextColor="#666"
           value={newExpense.category}
           onChangeText={(t) => setNewExpense({ ...newExpense, category: t })}
         />
@@ -122,6 +123,7 @@ export default function ExpensesScreen() {
         <TextInput
           placeholder="0"
           keyboardType="numeric"
+          placeholderTextColor="#666"
           style={styles.input}
           value={newExpense.amount}
           onChangeText={(t) => setNewExpense({ ...newExpense, amount: t })}

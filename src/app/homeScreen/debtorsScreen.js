@@ -155,7 +155,7 @@ export default function DebtorsScreen() {
       const orderedMap = {}; // { product: { totalQty, price } }
       (Array.isArray(allOrders) ? allOrders : [])
         .filter(
-          (o) => o.client?.trim().toLowerCase() === clientName && o.product
+          (o) => o.client?.trim().toLowerCase() === clientName && o.product,
         )
         .forEach((o) => {
           const p = o.product.trim();
@@ -202,7 +202,7 @@ export default function DebtorsScreen() {
     if (qty > selectedReturnProduct.remaining) {
       Alert.alert(
         "Ошибка",
-        `Можно вернуть не более ${selectedReturnProduct.remaining} шт`
+        `Можно вернуть не более ${selectedReturnProduct.remaining} шт`,
       );
       return;
     }
@@ -248,7 +248,7 @@ export default function DebtorsScreen() {
   }
 
   const marketsToRender = Object.keys(groupedDebtors).filter(
-    (marketName) => groupedDebtors[marketName].length > 0
+    (marketName) => groupedDebtors[marketName].length > 0,
   );
 
   return (
@@ -383,6 +383,7 @@ export default function DebtorsScreen() {
               <TextInput
                 style={styles.moneyInput}
                 keyboardType="numeric"
+                placeholderTextColor="#666"
                 placeholder="Сумма оплаты"
                 value={paymentAmount}
                 onChangeText={setPaymentAmount}
@@ -502,6 +503,7 @@ export default function DebtorsScreen() {
                   </Text>
                   <TextInput
                     editable={!returnLoading}
+                    placeholderTextColor="#666"
                     style={[
                       styles.moneyInput,
                       returnLoading && { opacity: 0.6 },
@@ -514,7 +516,7 @@ export default function DebtorsScreen() {
                       const num = parseInt(val) || 0;
                       if (num > selectedReturnProduct.remaining) {
                         setReturnQuantity(
-                          String(selectedReturnProduct.remaining)
+                          String(selectedReturnProduct.remaining),
                         );
                       } else {
                         setReturnQuantity(val);

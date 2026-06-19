@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { fetchAnalyticsMonths, getAnalytics } from "../../services/api";
+import { fetchAnalyticsMonths } from "../../services/api";
 
 const MONTHS = {
   "01": "Январь",
@@ -132,7 +132,8 @@ export default function ReportsScreen() {
 
             <View style={styles.divider} />
 
-            <Text style={styles.subtitle}>📦 Товары</Text>
+            <Text style={[styles.subtitle, { marginTop: 0 }]}>📦 Товары</Text>
+
             {(item.products || []).map((product, idx) => (
               <View key={idx} style={styles.itemRow}>
                 <View style={styles.itemLeft}>
@@ -271,7 +272,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#2D3436",
     fontWeight: "700",
-    marginTop: 10,
+    marginTop: 40,
     marginBottom: 12,
   },
   // Контейнер для списков (товары/клиенты)
@@ -305,6 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    marginTop: 10,
   },
   marketHeader: {
     marginBottom: 12,

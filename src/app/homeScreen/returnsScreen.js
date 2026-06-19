@@ -110,7 +110,9 @@ export default function ReturnsScreen() {
 
       {/* Ввод количества */}
       <Text style={styles.label}>Количество</Text>
-      <View style={[styles.inputWrapper, loading && styles.disabledInputWrapper]}>
+      <View
+        style={[styles.inputWrapper, loading && styles.disabledInputWrapper]}
+      >
         <Text style={styles.inputIcon}>🔄</Text>
         <TextInput
           style={styles.input}
@@ -118,7 +120,7 @@ export default function ReturnsScreen() {
           onChangeText={setQuantity}
           keyboardType="numeric"
           placeholder="0"
-          placeholderTextColor="#999"
+          placeholderTextColor="#666"
           editable={!loading}
         />
         <Text style={styles.unitText}>шт</Text>
@@ -131,7 +133,7 @@ export default function ReturnsScreen() {
         value={reason}
         onChangeText={setReason}
         placeholder="Например: брак, излишек, нерассчитали..."
-        placeholderTextColor="#999"
+        placeholderTextColor="#666"
         editable={!loading}
         multiline
       />

@@ -133,7 +133,7 @@ export async function getPayments() {
 
 export async function fetchFinanceReport() {
   const res = await axios.get(
-    `${BASE_URL}?action=financeReport&_t=${Date.now()}`
+    `${BASE_URL}?action=financeReport&_t=${Date.now()}`,
   );
   return res.data;
 }
@@ -173,6 +173,50 @@ export async function addOrderRow(data) {
 }
 export async function getReturns() {
   const res = await axios.get(`${BASE_URL}?action=returns&_t=${Date.now()}`);
+  return res.data;
+}
+export async function getNotes() {
+  const res = await axios.get(`${BASE_URL}?action=notes&_t=${Date.now()}`);
+
+  return res.data;
+}
+
+export async function saveNote(title, text) {
+  const res = await axios.post(BASE_URL, {
+    action: "saveNote",
+    title,
+    text,
+  });
+
+  return res.data;
+}
+
+export async function toggleNote(id, completed) {
+  const res = await axios.post(BASE_URL, {
+    action: "toggleNote",
+    id,
+    completed,
+  });
+
+  return res.data;
+}
+
+export async function deleteNote(id) {
+  const res = await axios.post(BASE_URL, {
+    action: "deleteNote",
+    id,
+  });
+
+  return res.data;
+}
+export async function updateNote(id, title, text) {
+  const res = await axios.post(BASE_URL, {
+    action: "updateNote",
+    id,
+    title,
+    text,
+  });
+
   return res.data;
 }
 // --- СТАРАЯ КЛИЕНТСКАЯ СОВМЕСТИМОСТЬ (Явный экспорт функций для экранов) ---

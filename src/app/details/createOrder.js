@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import HomeButton from "../../components/HomeButton/HomeButton";
+import { usePromo } from "../../context/PromoContext";
 import {
   getClients,
   getPrices,
@@ -40,7 +42,7 @@ export default function CreateOrder() {
     phone: "",
   });
   const [isSavingClient, setIsSavingClient] = useState(false);
-
+  const { promoEnabled } = usePromo();
   function openMarketModal() {
     setSelectType("market");
     setSearch("");
@@ -135,7 +137,7 @@ export default function CreateOrder() {
   }
 
   function calculatePromo(qty) {
-    const giftQty = Math.floor(qty / 10);
+    const giftQty = promoEnabled ? Math.floor(qty / 10) : 0;
     return {
       giftQty,
       finalQty: qty + giftQty,
@@ -260,13 +262,13 @@ export default function CreateOrder() {
   const marketList = Object.keys(clientsData).filter((key) => isNaN(key));
 
   const clientList = (clientsData[market] || []).filter((item) =>
-    item.toLowerCase().includes(search.toLowerCase())
+    item.toLowerCase().includes(search.toLowerCase()),
   );
 
   const data =
     selectType === "market"
       ? marketList.filter((item) =>
-          item.toLowerCase().includes(search.toLowerCase())
+          item.toLowerCase().includes(search.toLowerCase()),
         )
       : clientList;
 
@@ -282,6 +284,7 @@ export default function CreateOrder() {
   return (
     <>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <HomeButton />
         <Text style={styles.title}>Новый заказ</Text>
 
         <Text style={styles.label}>Дата доставки</Text>
@@ -409,7 +412,7 @@ export default function CreateOrder() {
               {hasQty && (
                 <TextInput
                   placeholder="Комментарий к товару (размер, замена...)"
-                  placeholderTextColor="#999"
+                  placeholderTextColor="#666"
                   value={item.comment}
                   onChangeText={(text) => changeComment(product, text)}
                   style={[styles.commentInput, loading && styles.disabledInput]}
@@ -455,7 +458,7 @@ export default function CreateOrder() {
             </Text>
             <TextInput
               placeholder="Поиск..."
-              placeholderTextColor="#999"
+              placeholderTextColor="#666"
               value={search}
               onChangeText={setSearch}
               style={styles.searchInput}
@@ -597,12 +600,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     paddingHorizontal: 16,
     marginBottom: 20,
+    paddingTop: 20,
   },
   title: {
     fontSize: 32,
     fontWeight: "800",
     color: "#1a1a1a",
-    marginTop: 60,
     marginBottom: 24,
     letterSpacing: -0.5,
   },

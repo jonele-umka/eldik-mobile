@@ -1,9 +1,4 @@
-import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -19,7 +14,7 @@ import {
   getOrders,
 } from "../../services/api";
 
-const AnalyticsScreen = forwardRef((props, ref) => {
+const AnalyticsScreen = forwardRef(({ noPadding = false }, ref) => {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState([]);
   const [finance, setFinance] = useState({});
@@ -135,7 +130,7 @@ const AnalyticsScreen = forwardRef((props, ref) => {
 
     return {
       products: Object.values(productsMap).sort(
-        (a, b) => b.revenue - a.revenue
+        (a, b) => b.revenue - a.revenue,
       ),
 
       clients: Object.values(clientsMap).sort((a, b) => b.revenue - a.revenue),
@@ -185,7 +180,7 @@ const AnalyticsScreen = forwardRef((props, ref) => {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, noPadding && { padding: 0 }]}
       // contentContainerStyle={{ paddingBottom: 40 }}
     >
       <Text style={styles.headerTitle}>
@@ -297,7 +292,7 @@ const AnalyticsScreen = forwardRef((props, ref) => {
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa", padding: 16 },
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
   headerTitle: {
     fontSize: 16,
     color: "#888",

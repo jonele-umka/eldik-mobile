@@ -65,7 +65,7 @@ export default function FinanceScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#22c55e" />
+        <ActivityIndicator size="large" color="#1a1a1a" />
       </View>
     );
   }

@@ -41,11 +41,11 @@ export default function PaymentScreen() {
         market,
         client,
         amount: parsedAmount,
-        comment: comment.trim(), 
+        comment: comment.trim(),
       });
 
       Alert.alert("Успех", "Платеж сохранен");
-      setAmount("1000"); 
+      setAmount("1000");
       setComment(""); // Сбрасываем комментарий после успешной отправки
     } catch (e) {
       Alert.alert("Ошибка", String(e));
@@ -92,7 +92,9 @@ export default function PaymentScreen() {
 
       {/* Ввод суммы */}
       <Text style={styles.label}>Сумма платежа</Text>
-      <View style={[styles.inputWrapper, loading && styles.disabledInputWrapper]}>
+      <View
+        style={[styles.inputWrapper, loading && styles.disabledInputWrapper]}
+      >
         <Text style={styles.currencyIcon}>💵</Text>
         <TextInput
           style={styles.input}
@@ -100,7 +102,7 @@ export default function PaymentScreen() {
           onChangeText={setAmount}
           keyboardType="numeric"
           placeholder="0"
-          placeholderTextColor="#999"
+          placeholderTextColor="#666"
           editable={!loading}
         />
         <Text style={styles.currencyText}>сом</Text>
@@ -113,7 +115,7 @@ export default function PaymentScreen() {
         value={comment}
         onChangeText={setComment}
         placeholder="Например: остаток за прошлую неделю, наличные..."
-        placeholderTextColor="#999"
+        placeholderTextColor="#666"
         editable={!loading}
         multiline
       />
